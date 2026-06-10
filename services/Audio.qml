@@ -97,8 +97,14 @@ Singleton {
                     const mut = parseInt(parts[2]);
                     if (!isNaN(driverId) && !isNaN(vol) && !isNaN(mut)) {
                         root.physicalDriverId = driverId;
-                        root.customVolume = vol;
-                        root.customMuted = mut;
+                        const dSink = Pipewire.defaultAudioSink;
+                        if (dSink && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink")) {
+                            root.customVolume = vol;
+                            root.customMuted = mut;
+                        } else {
+                            root.customVolume = -1;
+                            root.customMuted = -1;
+                        }
                         root.updateActiveSink();
                     }
                 } else {
@@ -142,8 +148,10 @@ Singleton {
                 const driverId = root.physicalDriverId;
                 if (driverId !== -1) {
                     const physicalSink = sinks.find(n => n.id === driverId);
-                    if (physicalSink) {
+                    if (physicalSink && physicalSink.properties["node.virtual"] !== "true" && physicalSink.name !== "easyeffects_sink") {
                         resolvedSink = physicalSink;
+                    } else {
+                        resolvedSink = null;
                     }
                 }
                 if (!resolvedSink) {
