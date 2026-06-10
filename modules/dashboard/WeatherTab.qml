@@ -2,10 +2,13 @@ import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
+import qs.components.controls
 import qs.services
 
 Item {
     id: root
+
+    required property var visibilities
 
     readonly property var today: Weather.forecast && Weather.forecast.length > 0 ? Weather.forecast[0] : null
 
@@ -42,6 +45,60 @@ Item {
 
             Item {
                 Layout.fillWidth: true
+            }
+
+            StyledRect {
+                id: searchBox
+                Layout.preferredWidth: 200
+                implicitHeight: 36
+                radius: Tokens.rounding.medium
+                color: Colours.layer(Colours.palette.m3surfaceContainer, 2)
+                border.width: 1
+                border.color: searchInput.activeFocus ? Colours.palette.m3primary : Qt.alpha(Colours.palette.m3outline, 0.3)
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: Tokens.padding.small
+                    anchors.rightMargin: Tokens.padding.small
+
+                    MaterialIcon {
+                        text: "search"
+                        color: Colours.palette.m3onSurfaceVariant
+                        fontStyle: Tokens.font.icon.small
+                    }
+
+                    StyledTextField {
+                        id: searchInput
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Search city...")
+                        placeholderTextColor: Colours.palette.m3onSurfaceVariant
+                        color: Colours.palette.m3onSurface
+
+                        onAccepted: {
+                            if (text.trim() !== "") {
+                                Weather.fetchCoordsFromCity(text.trim());
+                                text = "";
+                                focus = false;
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            propagateComposedEvents: true
+                            onPressed: mouse => {
+                                if (root.visibilities) {
+                                    root.visibilities.dashboardFocused = true;
+                                }
+                                searchInput.forceActiveFocus();
+                                mouse.accepted = false;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                Layout.preferredWidth: Tokens.spacing.medium
             }
 
             Row {

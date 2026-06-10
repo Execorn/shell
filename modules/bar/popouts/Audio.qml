@@ -38,7 +38,7 @@ Item {
         }
 
         Repeater {
-            model: Audio.sinks
+            model: Audio.physicalSinks
 
             StyledRadioButton {
                 id: control
@@ -59,7 +59,7 @@ Item {
         }
 
         Repeater {
-            model: Audio.sources
+            model: Audio.physicalSources
 
             StyledRadioButton {
                 required property PwNode modelData

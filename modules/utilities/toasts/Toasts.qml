@@ -10,10 +10,14 @@ import qs.services
 Item {
     id: root
 
+    required property ShellScreen screen
+
     readonly property int spacing: Tokens.spacing.small
     property bool flag
 
     function shouldShowToast(toast: Toast): bool {
+        if (root.screen.name !== Hypr.focusedMonitor.name)
+            return false;
         if (!Notifs.hasFullscreen())
             return true;
         if (Config.utilities.toasts.fullscreen === "all")

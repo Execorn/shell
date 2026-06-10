@@ -136,6 +136,7 @@ Item {
 
     Toasts.Toasts {
         id: toasts
+        screen: root.screen
 
         anchors.bottom: sidebar.visible ? parent.bottom : utilities.top
         anchors.right: sidebar.left

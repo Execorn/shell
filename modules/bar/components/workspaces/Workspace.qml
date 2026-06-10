@@ -7,6 +7,7 @@ import Caelestia.Config
 import qs.components
 import qs.services
 import qs.utils
+import Quickshell.Widgets
 
 ColumnLayout {
     id: root
@@ -15,6 +16,8 @@ ColumnLayout {
     required property int activeWsId
     required property var occupied
     required property int groupOffset
+
+    visible: root.isOccupied || root.activeWsId === root.ws
 
     readonly property bool isWorkspace: true // Flag for finding workspace children
     // Unanimated prop for others to use as reference
@@ -27,32 +30,35 @@ ColumnLayout {
     Layout.alignment: Qt.AlignHCenter
     Layout.preferredHeight: size
 
-    spacing: 0
+    spacing: 4
 
     StyledText {
-        id: indicator
-
+        id: wsNum
         Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-        Layout.preferredHeight: Tokens.sizes.bar.innerWidth - Tokens.padding.small
+        Layout.preferredHeight: Tokens.sizes.bar.innerWidth / 2
 
-        animate: true
-        text: {
-            const ws = Hypr.workspaces.values.find(w => w.id === root.ws);
-            const wsName = !ws || ws.name == root.ws ? root.ws : ws.name[0];
-            let displayName = wsName.toString();
-            if (Config.bar.workspaces.capitalisation.toLowerCase() === "upper") {
-                displayName = displayName.toUpperCase();
-            } else if (Config.bar.workspaces.capitalisation.toLowerCase() === "lower") {
-                displayName = displayName.toLowerCase();
-            }
-            const label = Config.bar.workspaces.label || displayName;
-            const occupiedLabel = Config.bar.workspaces.occupiedLabel || label;
-            const activeLabel = Config.bar.workspaces.activeLabel || (root.isOccupied ? occupiedLabel : label);
-            return root.activeWsId === root.ws ? activeLabel : root.isOccupied ? occupiedLabel : label;
-        }
-        color: Config.bar.workspaces.occupiedBg || root.isOccupied || root.activeWsId === root.ws ? Colours.palette.m3onSurface : Colours.layer(Colours.palette.m3outlineVariant, 2)
-        verticalAlignment: Qt.AlignVCenter
+        text: root.ws.toString()
+        color: root.activeWsId === root.ws && Config.bar.workspaces.activeIndicator ? Colours.palette.m3onPrimary : (Config.bar.workspaces.occupiedBg || root.isOccupied ? Colours.palette.m3onSurface : Colours.layer(Colours.palette.m3outlineVariant, 2))
         font.family: Tokens.font.workspaces
+        verticalAlignment: Qt.AlignVCenter
+    }
+
+    IconImage {
+        id: wsIcon
+        asynchronous: true
+        Layout.alignment: Qt.AlignHCenter
+        visible: root.isOccupied
+        width: 22
+        height: 22
+        source: {
+            if (root.isOccupied) {
+                const windows = Hypr.toplevels.values.filter(c => c.workspace?.id === root.ws);
+                if (windows.length > 0) {
+                    return Icons.getAppIcon(windows[0].lastIpcObject.class, "image-missing");
+                }
+            }
+            return "";
+        }
     }
 
     Loader {
@@ -65,7 +71,7 @@ ColumnLayout {
         Layout.topMargin: -Tokens.sizes.bar.innerWidth / 10
 
         visible: active
-        active: root.hasWindows
+        active: false
 
         sourceComponent: Column {
             spacing: 0

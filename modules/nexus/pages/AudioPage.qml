@@ -39,7 +39,7 @@ PageBase {
         }
 
         AudioDeviceList {
-            nodes: Audio.sinks
+            nodes: Audio.physicalSinks
             currentId: Audio.sink?.id ?? -1
             iconName: "speaker"
             placeholderIcon: "speaker"
@@ -68,7 +68,7 @@ PageBase {
         }
 
         AudioDeviceList {
-            nodes: Audio.sources
+            nodes: Audio.physicalSources
             currentId: Audio.source?.id ?? -1
             iconName: "mic"
             placeholderIcon: "mic_off"
