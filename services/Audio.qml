@@ -40,6 +40,7 @@ Singleton {
             const driverId = root.physicalDriverId;
             if (driverId !== -1) {
                 const volClamped = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
+                volumeSetProc.running = false;
                 volumeSetProc.command = ["wpctl", "set-volume", driverId.toString(), volClamped.toFixed(2)];
                 volumeSetProc.running = true;
                 root.customVolume = volClamped;
@@ -183,6 +184,7 @@ Singleton {
         if (stream === root.sink && root.customVolume !== -1) {
             const driverId = root.physicalDriverId;
             if (driverId !== -1) {
+                volumeSetProc.running = false;
                 volumeSetProc.command = ["wpctl", "set-mute", driverId.toString(), muted ? "1" : "0"];
                 volumeSetProc.running = true;
                 root.customMuted = muted ? 1 : 0;
