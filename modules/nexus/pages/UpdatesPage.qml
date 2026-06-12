@@ -201,9 +201,23 @@ PageBase {
                     mainLayout.statusCheckPending = false;
 
                     const status = text.trim();
-                    if (status === "active") {
+                    const recognized = ["active", "inactive", "failed", "activating", "deactivating", "reloading", "maintenance"];
+                    if (!status || recognized.indexOf(status) === -1) {
+                        if (mainLayout.upgradeStatus === "running") {
+                            mainLayout.upgradeStatus = "failed";
+                            mainLayout.onUpgradeCompleted();
+                        }
+                    } else if (status === "active") {
                         mainLayout.upgradeStatus = "running";
-                    } else if (status === "inactive" || status === "failed") {
+                        if (!logStreamProcess.running) {
+                            logStreamProcess.running = true;
+                        }
+                    } else if (status === "failed") {
+                        if (mainLayout.upgradeStatus === "running") {
+                            mainLayout.upgradeStatus = "failed";
+                            mainLayout.onUpgradeCompleted();
+                        }
+                    } else if (status === "inactive") {
                         if (mainLayout.upgradeStatus === "running") {
                             mainLayout.upgradeStatus = "stopped";
                             mainLayout.onUpgradeCompleted();
@@ -215,7 +229,7 @@ PageBase {
 
         Process {
             id: logStreamProcess
-            command: ["journalctl", "--user", "-u", "caelestia-upgrade.service", "-f"]
+            command: ["journalctl", "--user", "-u", "caelestia-upgrade.service", "-f", "-n", "0"]
             // qmllint disable incompatible-type
             environment: ({
                     // qmllint enable incompatible-type
