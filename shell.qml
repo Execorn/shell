@@ -11,6 +11,8 @@ import "modules/areapicker"
 import "modules/lock"
 import Quickshell
 
+import qs.services
+
 ShellRoot {
     settings.watchFiles: true
 
@@ -28,5 +30,9 @@ ShellRoot {
     BatteryMonitor {}
     IdleMonitors {
         lock: lock
+    }
+
+    Component.onCompleted: {
+        let _ = PluginManager;
     }
 }
