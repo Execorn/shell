@@ -12,6 +12,7 @@ Item {
     property var validator: null
     property bool readOnly: false
     property int horizontalAlignment: TextInput.AlignHCenter
+    property alias placeholderText: inputField.placeholderText
 
     // Expose activeFocus through alias to avoid FINAL property override
     readonly property alias hasFocus: inputField.activeFocus

@@ -32,8 +32,12 @@ Singleton {
 
     function reload(): void {
         const configLocation = GlobalConfig.services.weatherLocation;
+        const configCoordinates = GlobalConfig.services.weatherCoordinates;
 
-        if (configLocation) {
+        if (configCoordinates && configCoordinates.indexOf(",") !== -1) {
+            loc = configCoordinates;
+            city = configLocation || "Unknown City";
+        } else if (configLocation) {
             if (configLocation.indexOf(",") !== -1 && !isNaN(parseFloat(configLocation.split(",")[0]))) {
                 loc = configLocation;
                 fetchCityFromCoords(configLocation);
@@ -212,6 +216,10 @@ Singleton {
 
     Connections {
         function onWeatherLocationChanged(): void {
+            root.reload();
+        }
+
+        function onWeatherCoordinatesChanged(): void {
             root.reload();
         }
 
