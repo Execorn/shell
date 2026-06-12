@@ -18,6 +18,7 @@
 #include "userpaths.hpp"
 #include "utilitiesconfig.hpp"
 #include "winfoconfig.hpp"
+#include "themeconfig.hpp"
 
 #include <qqmlengine.h>
 #include <qstandardpaths.h>
@@ -50,7 +51,8 @@ GlobalConfig::GlobalConfig(QObject* parent)
     , m_sidebar(new SidebarConfig(this))
     , m_utilities(new UtilitiesConfig(this))
     , m_winfo(new WInfoConfig(this))
-    , m_paths(new UserPaths(this)) {
+    , m_paths(new UserPaths(this))
+    , m_theme(new ThemeConfig(this)) {
     setupFileBackend(configDir() + QStringLiteral("shell.json"));
 }
 
@@ -72,7 +74,8 @@ GlobalConfig::GlobalConfig(GlobalConfig* fallback, const QString& filePath, cons
     , m_sidebar(new SidebarConfig(this))
     , m_utilities(new UtilitiesConfig(this))
     , m_winfo(new WInfoConfig(this))
-    , m_paths(new UserPaths(this)) {
+    , m_paths(new UserPaths(this))
+    , m_theme(new ThemeConfig(this)) {
     if (!filePath.isEmpty())
         setupFileBackend(filePath, screen);
     if (fallback)

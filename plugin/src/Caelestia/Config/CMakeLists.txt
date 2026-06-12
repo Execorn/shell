@@ -28,6 +28,7 @@ qml_module(caelestia-config
         userpaths.hpp
         utilitiesconfig.hpp
         winfoconfig.hpp
+        themeconfig.hpp
     LIBRARIES
         Qt::Quick
         Qt::QuickControls2
