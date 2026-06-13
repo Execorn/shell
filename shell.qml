@@ -15,7 +15,7 @@ import QtQuick
 import qs.services
 
 ShellRoot {
-    settings.watchFiles: true
+    settings.watchFiles: false
 
     GSFLoader {}
 

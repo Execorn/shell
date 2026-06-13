@@ -8,4 +8,10 @@ PersistentProperties {
     property bool dashboard
     property bool utilities
     property bool sidebar
+    property bool dashboardFocused: false
+
+    onDashboardChanged: {
+        if (!dashboard)
+            dashboardFocused = false;
+    }
 }

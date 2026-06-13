@@ -180,7 +180,9 @@ Item {
             Component {
                 id: weatherComponent
 
-                WeatherTab {}
+                WeatherTab {
+                    visibilities: root.visibilities
+                }
             }
 
             Behavior on contentX {
