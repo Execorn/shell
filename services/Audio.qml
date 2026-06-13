@@ -36,16 +36,16 @@ Singleton {
     readonly property alias beatTracker: beatTracker
 
     function setVolume(newVolume: real): void {
-        if (root.customVolume !== -1) {
+        const dSink = Pipewire.defaultAudioSink;
+        const isEE = dSink && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
+        if (isEE && root.physicalDriverId !== -1) {
             const driverId = root.physicalDriverId;
-            if (driverId !== -1) {
-                const volClamped = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
-                volumeSetProc.running = false;
-                volumeSetProc.command = ["wpctl", "set-volume", driverId.toString(), volClamped.toFixed(2)];
-                volumeSetProc.running = true;
-                root.customVolume = volClamped;
-                root.customMuted = 0;
-            }
+            const volClamped = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
+            volumeSetProc.running = false;
+            volumeSetProc.command = ["wpctl", "set-volume", driverId.toString(), volClamped.toFixed(2)];
+            volumeSetProc.running = true;
+            root.customVolume = volClamped;
+            root.customMuted = 0;
         } else if (sink?.ready && sink?.audio) {
             sink.audio.muted = false;
             sink.audio.volume = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
@@ -86,33 +86,14 @@ Singleton {
     property int physicalDriverId: -1
 
     readonly property Process driverQueryProc: Process {
-        command: ["sh", "-c", "DRIVER_ID=$(pw-dump | jq '.[] | select(.info.props.\"node.name\" == \"easyeffects_sink\") | .info.props.\"node.driver-id\"' 2>/dev/null); if [ -n \"$DRIVER_ID\" ] && [ \"$DRIVER_ID\" != \"null\" ]; then VOL_INFO=$(wpctl get-volume \"$DRIVER_ID\"); VOL=$(echo \"$VOL_INFO\" | awk '{print $2}'); MUTED=0; if echo \"$VOL_INFO\" | grep -q \"MUTED\"; then MUTED=1; fi; echo \"$DRIVER_ID $VOL $MUTED\"; else echo \"-1\"; fi"]
+        command: ["sh", "-c", "DRIVER_ID=$(pw-dump | jq '.[] | select(.info.props.\"node.name\" == \"easyeffects_sink\") | .info.props.\"node.driver-id\"' 2>/dev/null); if [ -n \"$DRIVER_ID\" ] && [ \"$DRIVER_ID\" != \"null\" ]; then echo \"$DRIVER_ID\"; else echo \"-1\"; fi"]
         stdout: StdioCollector {
             onStreamFinished: {
                 console.log("[Audio.qml debug] driverQueryProc stdout finished, text:", text.trim());
-                const parts = text.trim().split(" ");
-                if (parts.length === 3) {
-                    const driverId = parseInt(parts[0]);
-                    const vol = parseFloat(parts[1]);
-                    const mut = parseInt(parts[2]);
-                    if (!isNaN(driverId) && !isNaN(vol) && !isNaN(mut)) {
-                        root.physicalDriverId = driverId;
-                        const dSink = Pipewire.defaultAudioSink;
-                        if (dSink && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink")) {
-                            root.customVolume = vol;
-                            root.customMuted = mut;
-                        } else {
-                            root.customVolume = -1;
-                            root.customMuted = -1;
-                        }
-                        root.updateActiveSink();
-                    }
-                } else {
-                    const val = parseInt(text.trim());
-                    if (val === -1) {
-                        root.physicalDriverId = -1;
-                        root.updateActiveSink();
-                    }
+                const val = parseInt(text.trim());
+                if (!isNaN(val)) {
+                    root.physicalDriverId = val;
+                    root.updateActiveSink();
                 }
             }
         }
@@ -143,18 +124,17 @@ Singleton {
         let resolvedSink = null;
         const dSink = Pipewire.defaultAudioSink;
         if (dSink) {
-            resolvedSink = dSink;
             if (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") {
                 const driverId = root.physicalDriverId;
                 if (driverId !== -1) {
                     const physicalSink = sinks.find(n => n.id === driverId);
                     if (physicalSink && physicalSink.properties["node.virtual"] !== "true" && physicalSink.name !== "easyeffects_sink") {
                         resolvedSink = physicalSink;
-                    } else {
-                        resolvedSink = null;
                     }
                 }
                 if (!resolvedSink) {
+                    root.customVolume = -1;
+                    root.customMuted = -1;
                     if (Pipewire.preferredDefaultAudioSink && Pipewire.preferredDefaultAudioSink.properties["node.virtual"] !== "true" && Pipewire.preferredDefaultAudioSink.name !== "easyeffects_sink") {
                         resolvedSink = Pipewire.preferredDefaultAudioSink;
                     } else if (physicalSinks.length > 0) {
@@ -162,6 +142,7 @@ Singleton {
                     }
                 }
             } else {
+                resolvedSink = dSink;
                 root.customVolume = -1;
                 root.customMuted = -1;
             }
@@ -189,14 +170,14 @@ Singleton {
     }
 
     function setStreamMuted(stream: PwNode, muted: bool): void {
-        if (stream === root.sink && root.customVolume !== -1) {
+        const dSink = Pipewire.defaultAudioSink;
+        const isEE = dSink && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
+        if (stream === root.sink && isEE && root.physicalDriverId !== -1) {
             const driverId = root.physicalDriverId;
-            if (driverId !== -1) {
-                volumeSetProc.running = false;
-                volumeSetProc.command = ["wpctl", "set-mute", driverId.toString(), muted ? "1" : "0"];
-                volumeSetProc.running = true;
-                root.customMuted = muted ? 1 : 0;
-            }
+            volumeSetProc.running = false;
+            volumeSetProc.command = ["wpctl", "set-mute", driverId.toString(), muted ? "1" : "0"];
+            volumeSetProc.running = true;
+            root.customMuted = muted ? 1 : 0;
         } else if (stream?.ready && stream?.audio) {
             stream.audio.muted = muted;
         }
