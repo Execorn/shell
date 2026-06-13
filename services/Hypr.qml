@@ -128,18 +128,23 @@ Singleton {
             if (n === "configreloaded") {
                 root.configReloaded();
                 root.reloadDynamicConfs();
+                autotileTimer.restart();
             } else if (["workspace", "moveworkspace", "activespecial", "focusedmon"].includes(n)) {
                 Hyprland.refreshWorkspaces();
                 Hyprland.refreshMonitors();
+                autotileTimer.restart();
             } else if (["openwindow", "closewindow", "movewindow"].includes(n)) {
                 Hyprland.refreshToplevels();
                 Hyprland.refreshWorkspaces();
+                autotileTimer.restart();
             } else if (n.includes("mon")) {
                 Hyprland.refreshMonitors();
             } else if (n.includes("workspace")) {
                 Hyprland.refreshWorkspaces();
+                autotileTimer.restart();
             } else if (n.includes("window") || n.includes("group") || ["pin", "fullscreen", "changefloatingmode", "minimize"].includes(n)) {
                 Hyprland.refreshToplevels();
+                autotileTimer.restart();
             }
         }
 
@@ -219,4 +224,100 @@ Singleton {
     HyprExtras {
         id: extras
     }
+
+    Timer {
+        id: autotileTimer
+        interval: 100
+        repeat: false
+        onTriggered: root.checkAndFixLayout()
+    }
+
+    function checkAndFixLayout() {
+        const activeWs = root.focusedWorkspace;
+        if (!activeWs) return;
+        const activeWsId = activeWs.id;
+
+        // Get all tiled (non-floating) mapped windows on the active workspace
+        const tiled = [];
+        const allToplevels = root.toplevels.values;
+        for (let i = 0; i < allToplevels.length; i++) {
+            const t = allToplevels[i];
+            const obj = t.lastIpcObject;
+            if (!obj) continue;
+            
+            const wsId = obj.workspace ? obj.workspace.id : -1;
+            if (wsId === activeWsId && !obj.floating && obj.mapped) {
+                tiled.push(obj);
+            }
+        }
+
+        if (tiled.length < 2) return;
+
+        // Group into vertical columns based on X and width
+        const columns = [];
+        for (let i = 0; i < tiled.length; i++) {
+            const c = tiled[i];
+            const x = c.at[0];
+            const w = c.size[0];
+            
+            let matched = false;
+            for (let j = 0; j < columns.length; j++) {
+                const col = columns[j];
+                const ref = col[0];
+                const ref_x = ref.at[0];
+                const ref_w = ref.size[0];
+                
+                if (Math.abs(x - ref_x) < 15 && Math.abs(w - ref_w) < 15) {
+                    col.push(c);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                columns.push([c]);
+            }
+        }
+
+        // Check deepest adjacent pair for each column
+        for (let i = 0; i < columns.length; i++) {
+            const col = columns[i];
+            if (col.length < 2) continue;
+
+            // Sort by Y coordinate
+            col.sort((a, b) => a.at[1] - b.at[1]);
+
+            // Get deepest pair
+            const c1 = col[col.length - 2];
+            const c2 = col[col.length - 1];
+
+            const x1 = c1.at[0];
+            const y1 = c1.at[1];
+            const w1 = c1.size[0];
+            const h1 = c1.size[1];
+
+            const x2 = c2.at[0];
+            const y2 = c2.at[1];
+            const w2 = c2.size[0];
+            const h2 = c2.size[1];
+
+            if (Math.abs(x1 - x2) < 15) {
+                const H = (y2 + h2) - y1;
+                const W = (w1 + w2) / 2;
+
+                if (W > H * 1.1) {
+                    console.log("[Autotile] Suboptimal stack detected: " + c1.class + " and " + c2.class + ". W=" + W + ", H=" + H + ". Forcing side-by-side.");
+                    
+                    // Focus c1 if the active window is not one of them
+                    const activeT = root.activeToplevel;
+                    const activeAddr = activeT ? activeT.lastIpcObject.address : "";
+                    if (activeAddr !== c1.address && activeAddr !== c2.address) {
+                        root.dispatch("focuswindow address:" + c1.address);
+                    }
+                    root.dispatch("layoutmsg togglesplit");
+                    return; // Exit after one correction
+                }
+            }
+        }
+    }
 }
+

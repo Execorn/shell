@@ -10,6 +10,7 @@ import "modules/background"
 import "modules/areapicker"
 import "modules/lock"
 import Quickshell
+import QtQuick
 
 import qs.services
 
@@ -34,5 +35,6 @@ ShellRoot {
 
     Component.onCompleted: {
         let _ = PluginManager;
+        let _2 = Hypr;
     }
 }
