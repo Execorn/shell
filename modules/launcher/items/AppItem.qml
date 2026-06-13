@@ -10,11 +10,12 @@ import qs.modules.launcher.services
 Item {
     id: root
 
-    required property DesktopEntry modelData
+    required property var modelData
     required property DrawerVisibilities visibilities
+    property var list: null
 
     readonly property bool isX11Only: {
-        if (!modelData) return false;
+        if (!modelData || modelData.isGroup || modelData.isBack) return false;
         const id = (modelData.id || "").toLowerCase();
         const name = (modelData.name || "").toLowerCase();
         const exec = (modelData.execString || "").toLowerCase();
@@ -43,11 +44,24 @@ Item {
     anchors.left: parent?.left
     anchors.right: parent?.right
 
+    function trigger(): void {
+        if (modelData.isGroup) {
+            if (list) {
+                list.savedGroupIndex = list.currentIndex;
+                list.activeGroup = modelData;
+            }
+        } else if (modelData.isBack) {
+            if (list) list.activeGroup = null;
+        } else {
+            Apps.launch(modelData);
+            visibilities.launcher = false;
+        }
+    }
+
     StateLayer {
         radius: Tokens.rounding.large
         onClicked: {
-            Apps.launch(root.modelData);
-            root.visibilities.launcher = false;
+            root.trigger();
         }
     }
 
@@ -84,6 +98,7 @@ Item {
                     id: name
                     text: root.modelData?.name ?? ""
                     font: Tokens.font.body.medium
+                    color: (root.modelData && root.modelData.isX11) ? Colours.palette.m3error : Colours.palette.m3onSurface
                 }
 
                 StyledText {
@@ -115,7 +130,7 @@ Item {
             asynchronous: true
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
-            active: root.modelData && Strings.testRegexList(GlobalConfig.launcher.favouriteApps, root.modelData.id)
+            active: root.modelData && !root.modelData.isGroup && !root.modelData.isBack && Strings.testRegexList(GlobalConfig.launcher.favouriteApps, root.modelData.id)
 
             sourceComponent: MaterialIcon {
                 text: "favorite"
