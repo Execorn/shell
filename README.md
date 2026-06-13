@@ -1,5 +1,29 @@
 <h1 align=center>caelestia-shell</h1>
 
+## Execorn's Fork of Caelestia Shell
+
+This is a personal fork of the original [caelestia-dots/shell](https://github.com/caelestia-dots/shell) repository by **Execorn**. It features several major enhancements, bug fixes, and key functional additions designed to streamline desktop navigation, improve audio/video workflows, and enhance the visual theme of the Caelestia desktop shell.
+
+### Major Changes & Advancements:
+
+- **Smart Dynamic Applications Grouping (`Super+D`)**:
+  - Dynamically clusters applications belonging to the same suite or environment (e.g. LibreOffice, Avahi, Qt development utilities, Bluetooth tools, and Xfce Suite) into single folder-like Group entries when the search input is empty.
+  - Implements **Index/Scroll Position Restoration** using `Qt.callLater` and `positionViewAtIndex` so that navigating back from a group places your highlight cursor exactly on the group you just exited.
+  - Features global search bypass: typing a query instantly falls back to flat search results for maximum speed.
+- **Red "X11 Apps" Classifier**:
+  - Automatically parses application ID, Name, and Exec command metadata to detect X11-only applications (like Arandr, Lxappearance, Picom, etc.).
+  - Clusters all X11-only tools inside a dedicated **"X11 Apps"** group highlighted in bold **RED** (`Colours.palette.m3error`) to serve as a visual warning.
+- **EasyEffects Master Volume & HUD Synchronization**:
+  - Re-routed volume controls and shell sliders to target underlying physical hardware sink devices instead of the virtual loopback sink (`easyeffects_sink`), resolving Master volume adjustments and HUD/OSD display.
+  - Bypassed volume/mute state flickering and startup switch notifications by separating physical tracking lists.
+- **Panel Workspace Icons & Stack Indicators**:
+  - Re-enabled full-color workspace icons and structured precise Z-depth layering so that active indicator background pills stack behind icons cleanly.
+- **Weather Widget Live Geocoding Search**:
+  - Added a search bar to the Weather dashboard tab that contacts the Open-Meteo Geocoding API to dynamically load 7-day forecasts for any city.
+  - Handled interactive desktop window focus grab to allow keyboard input when typing search queries.
+
+---
+
 <div align=center>
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/caelestia-dots/shell?style=for-the-badge&labelColor=101418&color=9ccbfb)
