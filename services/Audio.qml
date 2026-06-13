@@ -86,14 +86,25 @@ Singleton {
     property int physicalDriverId: -1
 
     readonly property Process driverQueryProc: Process {
-        command: ["sh", "-c", "RC_FILE=\"$HOME/.config/easyeffects/db/easyeffectsrc\"; if [ -f \"$RC_FILE\" ]; then USE_DEFAULT=$(grep '^useDefaultOutputDevice=' \"$RC_FILE\" | cut -d= -f2); OUT_DEV=$(grep '^outputDevice=' \"$RC_FILE\" | cut -d= -f2); if [ \"$USE_DEFAULT\" = \"false\" ] && [ -n \"$OUT_DEV\" ]; then TARGET_ID=$(pw-dump | jq --arg name \"$OUT_DEV\" '.[] | select(.info.props.\"node.name\" == $name) | .id' 2>/dev/null); if [ -n \"$TARGET_ID\" ] && [ \"$TARGET_ID\" != \"null\" ]; then echo \"$TARGET_ID\"; exit 0; fi; fi; fi; echo \"-1\""]
+        command: ["sh", "-c", "USE_DEFAULT_OUT=$(dconf read /com/github/wwmm/easyeffects/streamoutputs/use-default-output-device 2>/dev/null || echo 'false'); OUT_DEV=$(dconf read /com/github/wwmm/easyeffects/streamoutputs/output-device 2>/dev/null | tr -d \"'\" || echo ''); USE_DEFAULT_IN=$(dconf read /com/github/wwmm/easyeffects/streaminputs/use-default-input-device 2>/dev/null || echo 'false'); TARGET_ID='-1'; if [ \"$USE_DEFAULT_OUT\" = \"false\" ] && [ -n \"$OUT_DEV\" ]; then RESOLVED_ID=$(pw-dump | jq --arg name \"$OUT_DEV\" '.[] | select(.info.props.\"node.name\" == $name) | .id' 2>/dev/null); if [ -n \"$RESOLVED_ID\" ] && [ \"$RESOLVED_ID\" != \"null\" ]; then TARGET_ID=\"$RESOLVED_ID\"; fi; fi; echo \"$TARGET_ID $USE_DEFAULT_OUT $USE_DEFAULT_IN\""]
         stdout: StdioCollector {
             onStreamFinished: {
                 console.log("[Audio.qml debug] driverQueryProc stdout finished, text:", text.trim());
-                const val = parseInt(text.trim());
-                if (!isNaN(val)) {
-                    root.physicalDriverId = val;
-                    root.updateActiveSink();
+                const parts = text.trim().split(" ");
+                if (parts.length >= 3) {
+                    const targetId = parseInt(parts[0]);
+                    const useDefaultOutput = parts[1] === "true";
+                    const useDefaultInput = parts[2] === "true";
+
+                    if (useDefaultOutput || useDefaultInput) {
+                        console.log("[Audio.qml debug] Detected use-default-output or use-default-input set to true. Enforcing custom routing...");
+                        root.forceUpdateEasyEffectsRouting();
+                    }
+
+                    if (!isNaN(targetId)) {
+                        root.physicalDriverId = targetId;
+                        root.updateActiveSink();
+                    }
                 }
             }
         }
@@ -104,6 +115,127 @@ Singleton {
                 }
             }
         }
+    }
+
+    property string lastAppliedEeSink: ""
+    property string lastAppliedEeSource: ""
+    readonly property Process eeUpdateProc: Process {}
+
+    function getBestOutputSinkName(): string {
+        if (physicalSinks.length === 0) return "";
+        
+        // 1. Look for Bluetooth headphones/speakers
+        for (let i = 0; i < physicalSinks.length; i++) {
+            const s = physicalSinks[i];
+            if (s.name.indexOf("bluez_output") === 0) {
+                return s.name;
+            }
+        }
+        
+        // 2. Look for USB audio cards / speakers
+        for (let i = 0; i < physicalSinks.length; i++) {
+            const s = physicalSinks[i];
+            if (s.name.indexOf("alsa_output.usb") === 0 || s.name.indexOf("usb-") !== -1) {
+                return s.name;
+            }
+        }
+        
+        // 3. Fallback to any physical sink that is not the built-in speaker, just in case
+        for (let i = 0; i < physicalSinks.length; i++) {
+            const s = physicalSinks[i];
+            if (s.name !== "alsa_output.pci-0000_05_00.6.analog-stereo" && s.name.indexOf("pci-") === -1) {
+                return s.name;
+            }
+        }
+        
+        // 4. Default fallback: computer speakers
+        const internalSink = physicalSinks.find(s => s.name.indexOf("pci-") !== -1 || s.name.indexOf("analog-stereo") !== -1);
+        if (internalSink) {
+            return internalSink.name;
+        }
+        
+        return physicalSinks[0].name;
+    }
+
+    function getBestInputSourceName(): string {
+        const realSources = [];
+        for (let i = 0; i < physicalSources.length; i++) {
+            const s = physicalSources[i];
+            if (s.name.indexOf(".monitor") === -1 && 
+                s.name.indexOf("monitor") === -1 &&
+                s.name.indexOf("easyeffects") === -1) {
+                realSources.push(s);
+            }
+        }
+        
+        if (realSources.length === 0) return "";
+        
+        // 1. Look for Bluetooth microphone
+        for (let i = 0; i < realSources.length; i++) {
+            const s = realSources[i];
+            if (s.name.indexOf("bluez_input") === 0) {
+                return s.name;
+            }
+        }
+        
+        // 2. Look for USB microphone
+        for (let i = 0; i < realSources.length; i++) {
+            const s = realSources[i];
+            if (s.name.indexOf("alsa_input.usb") === 0 || s.name.indexOf("usb-") !== -1) {
+                return s.name;
+            }
+        }
+        
+        // 3. Fallback to built-in mic
+        const internalMic = realSources.find(s => s.name.indexOf("pci-") !== -1 || s.name.indexOf("analog-") !== -1);
+        if (internalMic) {
+            return internalMic.name;
+        }
+        
+        return realSources[0].name;
+    }
+
+    function updateEasyEffectsRouting(): void {
+        const bestSink = getBestOutputSinkName();
+        const bestSource = getBestInputSourceName();
+        console.log("[Audio.qml debug] updateEasyEffectsRouting. bestSink:", bestSink, "bestSource:", bestSource, "lastAppliedEeSink:", lastAppliedEeSink, "lastAppliedEeSource:", lastAppliedEeSource);
+        
+        let changed = false;
+        if (bestSink !== root.lastAppliedEeSink) {
+            root.lastAppliedEeSink = bestSink;
+            changed = true;
+        }
+        if (bestSource !== root.lastAppliedEeSource) {
+            root.lastAppliedEeSource = bestSource;
+            changed = true;
+        }
+        
+        if (changed && (bestSink || bestSource)) {
+            applyEasyEffectsRouting(bestSink, bestSource);
+        }
+    }
+
+    function forceUpdateEasyEffectsRouting(): void {
+        root.lastAppliedEeSink = "";
+        root.lastAppliedEeSource = "";
+        updateEasyEffectsRouting();
+    }
+
+    function applyEasyEffectsRouting(sinkName: string, sourceName: string): void {
+        let cmd = "";
+        cmd += "dconf write /com/github/wwmm/easyeffects/streamoutputs/use-default-output-device false; ";
+        if (sinkName) {
+            cmd += "dconf write /com/github/wwmm/easyeffects/streamoutputs/output-device \"'" + sinkName + "'\"; ";
+        }
+        cmd += "dconf write /com/github/wwmm/easyeffects/streaminputs/use-default-input-device false; ";
+        if (sourceName) {
+            cmd += "dconf write /com/github/wwmm/easyeffects/streaminputs/input-device \"'" + sourceName + "'\"; ";
+        }
+        
+        console.log("[Audio.qml debug] Applying EasyEffects routing. Command:", cmd);
+        eeUpdateProc.running = false;
+        eeUpdateProc.command = ["sh", "-c", cmd];
+        eeUpdateProc.running = true;
     }
 
     readonly property Process volumeSetProc: Process {}
@@ -232,6 +364,7 @@ Singleton {
         pollTimer.triggerPoll();
         previousSinkName = sink?.description || sink?.name || qsTr("Unknown Device");
         previousSourceName = source?.description || source?.name || qsTr("Unknown Device");
+        root.updateEasyEffectsRouting();
     }
 
     Connections {
@@ -269,6 +402,7 @@ Singleton {
             root.physicalSources = newPhysicalSources;
 
             root.updateActiveSink();
+            root.updateEasyEffectsRouting();
         }
 
         target: Pipewire.nodes
