@@ -86,7 +86,7 @@ Singleton {
     property int physicalDriverId: -1
 
     readonly property Process driverQueryProc: Process {
-        command: ["sh", "-c", "DRIVER_ID=$(pw-dump | jq '.[] | select(.info.props.\"node.name\" == \"easyeffects_sink\") | .info.props.\"node.driver-id\"' 2>/dev/null); if [ -n \"$DRIVER_ID\" ] && [ \"$DRIVER_ID\" != \"null\" ]; then echo \"$DRIVER_ID\"; else echo \"-1\"; fi"]
+        command: ["sh", "-c", "RC_FILE=\"$HOME/.config/easyeffects/db/easyeffectsrc\"; if [ -f \"$RC_FILE\" ]; then USE_DEFAULT=$(grep '^useDefaultOutputDevice=' \"$RC_FILE\" | cut -d= -f2); OUT_DEV=$(grep '^outputDevice=' \"$RC_FILE\" | cut -d= -f2); if [ \"$USE_DEFAULT\" = \"false\" ] && [ -n \"$OUT_DEV\" ]; then TARGET_ID=$(pw-dump | jq --arg name \"$OUT_DEV\" '.[] | select(.info.props.\"node.name\" == $name) | .id' 2>/dev/null); if [ -n \"$TARGET_ID\" ] && [ \"$TARGET_ID\" != \"null\" ]; then echo \"$TARGET_ID\"; exit 0; fi; fi; fi; echo \"-1\""]
         stdout: StdioCollector {
             onStreamFinished: {
                 console.log("[Audio.qml debug] driverQueryProc stdout finished, text:", text.trim());
