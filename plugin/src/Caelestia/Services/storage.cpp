@@ -61,8 +61,7 @@ QStringList resolveAtNode(const QString& node, int depth) {
     }
 
     if (QFileInfo::exists(node + QStringLiteral("/partition"))) {
-        const QString diskNode = nodeInfo.path();
-        return { QFileInfo(diskNode).fileName() };
+        return { nodeInfo.fileName() };
     }
 
     const QDir slavesDir(node + QStringLiteral("/slaves"));
