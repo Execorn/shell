@@ -14,4 +14,9 @@ PersistentProperties {
         if (!dashboard)
             dashboardFocused = false;
     }
+
+    onLauncherChanged: {
+        if (launcher)
+            Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", "0"]);
+    }
 }
