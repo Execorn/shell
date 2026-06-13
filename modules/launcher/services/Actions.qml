@@ -20,7 +20,17 @@ Searcher {
     Variants {
         id: variants
 
-        model: GlobalConfig.launcher.actions.filter(a => (a.enabled ?? true) && (GlobalConfig.launcher.enableDangerousActions || !(a.dangerous ?? false)))
+        model: {
+            const list = GlobalConfig.launcher.actions.filter(a => (a.enabled ?? true) && (GlobalConfig.launcher.enableDangerousActions || !(a.dangerous ?? false)));
+            list.push({
+                "name": qsTr("Equalizer"),
+                "description": qsTr("Change the current equalizer settings / preset"),
+                "icon": "music_note",
+                "command": ["autocomplete", "eq"],
+                "enabled": true
+            });
+            return list;
+        }
 
         Action {}
     }
