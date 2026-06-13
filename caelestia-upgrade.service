@@ -1,0 +1,9 @@
+[Unit]
+Description=Caelestia System Upgrade Service
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/yay -Syu --noconfirm
+StandardOutput=journal
+StandardError=journal

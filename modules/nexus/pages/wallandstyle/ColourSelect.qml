@@ -22,6 +22,66 @@ PageBase {
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
 
+        // Process to run caelestia scheme set
+        Process {
+            id: schemeProcess
+
+            onExited: (exitCode, exitStatus) => {
+                if (exitCode !== 0) {
+                    console.warn("caelestia scheme set command failed with exit code: " + exitCode);
+                }
+            }
+        }
+
+        // FileView to check if the wallpaper exists on the filesystem
+        FileView {
+            id: wallpaperChecker
+            path: Wallpapers.current || ""
+            watchChanges: true
+            printErrors: false
+            
+            onLoadFailed: {
+                handleWallpaperMissing();
+            }
+        }
+
+        Connections {
+            target: Colours.palette
+            ignoreUnknownSignals: true
+            function onM3primaryChanged() {
+                if (GlobalConfig.theme.colorSource === "dynamic") {
+                    GlobalConfig.theme.extractedColors.primary = Colours.palette.m3primary;
+                }
+            }
+            function onM3secondaryChanged() {
+                if (GlobalConfig.theme.colorSource === "dynamic") {
+                    GlobalConfig.theme.extractedColors.secondary = Colours.palette.m3secondary;
+                }
+            }
+            function onM3tertiaryChanged() {
+                if (GlobalConfig.theme.colorSource === "dynamic") {
+                    GlobalConfig.theme.extractedColors.tertiary = Colours.palette.m3tertiary;
+                }
+            }
+        }
+
+        Connections {
+            target: GlobalConfig.theme
+            ignoreUnknownSignals: true
+            function onCustomAccentHSLChanged() {
+                if (!validateHslString(GlobalConfig.theme.customAccentHSL)) {
+                    GlobalConfig.theme.customAccentHSL = "220,100,50";
+                }
+            }
+            function onFlavorChanged() {
+                let flavor = GlobalConfig.theme.flavor;
+                const validFlavors = ["tonal-spot", "vibrant", "expressive", "monochrome"];
+                if (!validFlavors.includes(flavor)) {
+                    GlobalConfig.theme.flavor = "tonal-spot";
+                }
+            }
+        }
+
         SectionHeader {
             text: qsTr("General Settings")
             first: true
@@ -138,65 +198,6 @@ PageBase {
         }
     }
 
-    // Process to run caelestia scheme set
-    Process {
-        id: schemeProcess
-
-        onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0) {
-                console.warn("caelestia scheme set command failed with exit code: " + exitCode);
-            }
-        }
-    }
-
-    // FileView to check if the wallpaper exists on the filesystem
-    FileView {
-        id: wallpaperChecker
-        path: Wallpapers.current || ""
-        watchChanges: true
-        printErrors: false
-        
-        onLoadFailed: {
-            handleWallpaperMissing();
-        }
-    }
-
-    Connections {
-        target: Colours.palette
-        ignoreUnknownSignals: true
-        function onM3primaryChanged() {
-            if (GlobalConfig.theme.colorSource === "dynamic") {
-                GlobalConfig.theme.extractedColors.primary = Colours.palette.m3primary;
-            }
-        }
-        function onM3secondaryChanged() {
-            if (GlobalConfig.theme.colorSource === "dynamic") {
-                GlobalConfig.theme.extractedColors.secondary = Colours.palette.m3secondary;
-            }
-        }
-        function onM3tertiaryChanged() {
-            if (GlobalConfig.theme.colorSource === "dynamic") {
-                GlobalConfig.theme.extractedColors.tertiary = Colours.palette.m3tertiary;
-            }
-        }
-    }
-
-    Connections {
-        target: GlobalConfig.theme
-        ignoreUnknownSignals: true
-        function onCustomAccentHSLChanged() {
-            if (!validateHslString(GlobalConfig.theme.customAccentHSL)) {
-                GlobalConfig.theme.customAccentHSL = "220,100,50";
-            }
-        }
-        function onFlavorChanged() {
-            let flavor = GlobalConfig.theme.flavor;
-            const validFlavors = ["tonal-spot", "vibrant", "expressive", "monochrome"];
-            if (!validFlavors.includes(flavor)) {
-                GlobalConfig.theme.flavor = "tonal-spot";
-            }
-        }
-    }
 
     Component.onCompleted: {
         // Run initial sanity check on load

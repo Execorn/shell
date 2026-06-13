@@ -49,6 +49,7 @@ StyledClippingRect {
         Loader {
             asynchronous: true
             active: Config.bar.workspaces.occupiedBg
+            z: -2
 
             anchors.fill: parent
             anchors.margins: Tokens.padding.extraSmall
@@ -83,6 +84,7 @@ StyledClippingRect {
             asynchronous: true
             anchors.horizontalCenter: parent.horizontalCenter
             active: Config.bar.workspaces.activeIndicator
+            z: -1
 
             sourceComponent: ActiveIndicator {
                 activeWsId: root.activeWsId

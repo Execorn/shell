@@ -8,6 +8,7 @@ import qs.components
 import qs.components.controls
 import qs.services
 import qs.utils
+import qs.components.effects
 import qs.modules.nexus.common
 
 PageBase {
@@ -111,76 +112,12 @@ PageBase {
     onSelectedRotationChanged: queueApply()
     onSelectedScaleChanged: queueApply()
 
-    Timer {
-        id: applyDebounceTimer
-        interval: 300
-        repeat: false
-        onTriggered: {
-            root.applyChanges();
-        }
-    }
-
-    Timer {
-        id: countdownTimer
-        interval: 1000
-        repeat: true
-        onTriggered: {
-            root.countdown--;
-            if (root.countdown <= 0) {
-                countdownTimer.stop();
-                root.revertChanges();
-            }
-        }
-    }
-
-    FileView {
-        id: monitorsFile
-        path: Paths.config + "/monitors.json"
-
-        onReadyChanged: {
-            if (ready) {
-                root.loadConfig(text);
-            }
-        }
-        onTextChanged: {
-            if (ready) {
-                root.loadConfig(text);
-            }
-        }
-    }
-
-    Process {
-        id: getMonitorsProcess
-        running: true
-        command: ["hyprctl", "monitors", "-j"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var parsed = JSON.parse(text);
-                    root.activeMonitors = parsed;
-                    if (!monitorsFile.exists || monitorsFile.text.trim() === "") {
-                        root.recoverCorrupted(parsed);
-                    } else {
-                        try {
-                            var saved = JSON.parse(monitorsFile.text);
-                            if (!Array.isArray(saved)) {
-                                root.recoverCorrupted(parsed);
-                            } else {
-                                root.monitorsConfig = saved;
-                            }
-                        } catch (e) {
-                            root.recoverCorrupted(parsed);
-                        }
-                    }
-                } catch (e) {
-                    console.log("Failed to parse hyprctl output:", e);
-                }
-            }
-        }
-    }
 
     function loadConfig(text) {
         if (!text || text.trim() === "") {
+            if (root.monitorsConfig && root.monitorsConfig.length > 0) {
+                return;
+            }
             if (activeMonitors.length > 0) {
                 recoverCorrupted(activeMonitors);
             } else {
@@ -191,6 +128,9 @@ PageBase {
         try {
             var parsed = JSON.parse(text);
             if (!Array.isArray(parsed)) {
+                if (root.monitorsConfig && root.monitorsConfig.length > 0) {
+                    return;
+                }
                 if (activeMonitors.length > 0) {
                     recoverCorrupted(activeMonitors);
                 } else {
@@ -203,6 +143,9 @@ PageBase {
                 }
             }
         } catch (e) {
+            if (root.monitorsConfig && root.monitorsConfig.length > 0) {
+                return;
+            }
             if (activeMonitors.length > 0) {
                 recoverCorrupted(activeMonitors);
             } else {
@@ -244,7 +187,7 @@ PageBase {
         var cmd = [
             "sh",
             "-c",
-            triggerReload ? "echo \"$1\" > \"$2\" && hyprctl reload" : "echo \"$1\" > \"$2\"",
+            triggerReload ? "echo \"$1\" > \"$2.tmp\" && mv \"$2.tmp\" \"$2\" && hyprctl reload" : "echo \"$1\" > \"$2.tmp\" && mv \"$2.tmp\" \"$2\"",
             "sh",
             jsonStr,
             Paths.config + "/monitors.json"
@@ -374,29 +317,175 @@ PageBase {
         root.refreshActiveMonitors();
     }
 
-    Variants {
-        id: resolutionItems
-        model: root.availableResolutions
-        MenuItem {
-            required property var modelData
-            text: modelData
-        }
-    }
 
-    Variants {
-        id: refreshRateItems
-        model: root.availableRefreshRates
-        MenuItem {
-            required property var modelData
-            text: modelData.toFixed(2) + "Hz"
-        }
-    }
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
+
+        Timer {
+            id: applyDebounceTimer
+            interval: 300
+            repeat: false
+            onTriggered: {
+                root.applyChanges();
+            }
+        }
+
+        Timer {
+            id: countdownTimer
+            interval: 1000
+            repeat: true
+            onTriggered: {
+                root.countdown--;
+                if (root.countdown <= 0) {
+                    countdownTimer.stop();
+                    root.revertChanges();
+                }
+            }
+        }
+
+        FileView {
+            id: monitorsFile
+            path: Paths.config + "/monitors.json"
+            watchChanges: true
+
+            onLoaded: {
+                root.loadConfig(text());
+            }
+            onFileChanged: {
+                root.loadConfig(text());
+            }
+            onLoadFailed: {
+                if (root.activeMonitors.length > 0) {
+                    root.recoverCorrupted(root.activeMonitors);
+                } else {
+                    root.refreshActiveMonitors();
+                }
+            }
+        }
+
+        Process {
+            id: getMonitorsProcess
+            running: true
+            command: ["hyprctl", "monitors", "-j"]
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    try {
+                        var parsed = JSON.parse(text);
+                        root.activeMonitors = parsed;
+                        if (!root.monitorsConfig || root.monitorsConfig.length === 0) {
+                            root.recoverCorrupted(parsed);
+                        }
+                    } catch (e) {
+                        console.log("Failed to parse hyprctl output:", e);
+                    }
+                }
+            }
+        }
+
+        Variants {
+            id: resolutionItems
+            model: root.availableResolutions
+            MenuItem {
+                required property var modelData
+                text: modelData
+            }
+        }
+
+        Variants {
+            id: refreshRateItems
+            model: root.availableRefreshRates
+            MenuItem {
+                required property var modelData
+                text: modelData.toFixed(2) + "Hz"
+            }
+        }
+
+        Item {
+            id: revertModal
+            visible: false
+
+            Component.onCompleted: {
+                parent = root;
+            }
+
+            anchors.fill: parent
+            z: 9999
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                preventStealing: true
+                onWheel: e => e.accepted = true
+                onClicked: {}
+                onPressed: {}
+                onReleased: {}
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: Colours.palette.m3scrim
+                opacity: 0.6
+            }
+
+            Elevation {
+                anchors.centerIn: parent
+                width: Math.min(400, parent.width - 40)
+                height: 200
+                radius: Tokens.rounding.large
+                level: 3
+
+                StyledRect {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: Colours.palette.m3surfaceContainerHighest
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: Tokens.padding.largeIncreased
+                        spacing: Tokens.spacing.medium
+
+                        StyledText {
+                            text: qsTr("Confirm Display Changes")
+                            font: Tokens.font.title.large
+                            color: Colours.palette.m3onSurface
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+
+                        StyledText {
+                            text: qsTr("Reverting display settings in %1 seconds...").arg(root.countdown)
+                            font: Tokens.font.body.medium
+                            color: Colours.palette.m3onSurfaceVariant
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        RowLayout {
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: Tokens.spacing.medium
+
+                            TextButton {
+                                text: qsTr("Revert")
+                                onClicked: {
+                                    root.revertChanges();
+                                }
+                            }
+
+                            TextButton {
+                                text: qsTr("Keep Changes")
+                                onClicked: {
+                                    root.keepChanges();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         SectionHeader {
             first: true
@@ -542,86 +631,5 @@ PageBase {
         }
     }
 
-    Item {
-        id: revertModal
-        visible: false
 
-        Component.onCompleted: {
-            parent = root;
-        }
-
-        anchors.fill: parent
-        z: 9999
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            preventStealing: true
-            onWheel: e => e.accepted = true
-            onClicked: {}
-            onPressed: {}
-            onReleased: {}
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: Colours.palette.m3scrim
-            opacity: 0.6
-        }
-
-        Elevation {
-            anchors.centerIn: parent
-            width: Math.min(400, parent.width - 40)
-            height: 200
-            radius: Tokens.rounding.large
-            level: 3
-
-            StyledRect {
-                anchors.fill: parent
-                radius: parent.radius
-                color: Colours.palette.m3surfaceContainerHighest
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Tokens.padding.largeIncreased
-                    spacing: Tokens.spacing.medium
-
-                    StyledText {
-                        text: qsTr("Confirm Display Changes")
-                        font: Tokens.font.title.large
-                        color: Colours.palette.m3onSurface
-                        Layout.alignment: Qt.AlignHCenter
-                    }
-
-                    StyledText {
-                        text: qsTr("Reverting display settings in %1 seconds...").arg(root.countdown)
-                        font: Tokens.font.body.medium
-                        color: Colours.palette.m3onSurfaceVariant
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: Tokens.spacing.medium
-
-                        TextButton {
-                            text: qsTr("Revert")
-                            onClicked: {
-                                root.revertChanges();
-                            }
-                        }
-
-                        TextButton {
-                            text: qsTr("Keep Changes")
-                            onClicked: {
-                                root.keepChanges();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
