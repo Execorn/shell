@@ -114,8 +114,6 @@ Scope {
         name: "cheatsheet"
         description: "Toggle cheatsheet"
         onPressed: {
-            if (root.hasFullscreen)
-                return;
             const visibilities = Visibilities.getForActive();
             visibilities.cheatsheet = !visibilities.cheatsheet;
         }
