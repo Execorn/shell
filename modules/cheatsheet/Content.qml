@@ -55,6 +55,7 @@ StyledRect {
 
     function getCategoryIcon(category) {
         const cat = (category || "").toLowerCase();
+        if (cat.includes("window")) return "grid_view";
         if (cat.includes("launcher")) return "search";
         if (cat.includes("session") || cat.includes("lock") || cat.includes("sleep")) return "power_settings_new";
         if (cat.includes("brightness")) return "brightness_6";
