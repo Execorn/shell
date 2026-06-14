@@ -56,21 +56,28 @@ StyledWindow {
         return Math.max(...thresholds);
     }
 
+    readonly property bool anyDrawerActive: visibilities.launcher
+                                         || visibilities.session
+                                         || visibilities.dashboard
+                                         || visibilities.cheatsheet
+                                         || visibilities.sidebar
+
     onHasFullscreenChanged: {
         visibilities.launcher = false;
         visibilities.session = false;
         visibilities.dashboard = false;
+        visibilities.cheatsheet = false;
         panels.popouts.close();
     }
 
     name: "drawers"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: (fsTransitionProg > 0 && (contentItem.Config.general.showOverFullscreen || panels.osd.offsetScale < 1))
+    WlrLayershell.layer: (fsTransitionProg > 0 && (contentItem.Config.general.showOverFullscreen || panels.osd.offsetScale < 1 || anyDrawerActive))
                       || (hasSpecialWorkspace && hasFullscreenOnNormalWs)
                       ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: visibilities.launcher || visibilities.session || visibilities.dashboard || visibilities.cheatsheet ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-    mask: hasFullscreen ? emptyRegion : regions
+    mask: (hasFullscreen && !anyDrawerActive) ? emptyRegion : regions
 
     anchors.top: true
     anchors.bottom: true
