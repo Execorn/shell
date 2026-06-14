@@ -627,7 +627,7 @@ def test_implicit_route_window():
 # Window Resize
 bind = SUPER, T, exec, kitty
 """)
-    assert data[0]["section"] == "Window Management"
+    assert data[0]["section"] == "Windows"
 
 def test_implicit_route_system():
     res, data = run_parser_with_content("", """
@@ -662,7 +662,7 @@ def test_t2_implicit_route_priority():
 # Window Volume
 bind = SUPER, T, exec, kitty
 """)
-    assert data[0]["section"] == "Window Management"
+    assert data[0]["section"] == "Windows"
 
 def test_t2_implicit_route_boundary():
     short_header = "W" * 39
@@ -685,7 +685,7 @@ def test_t2_implicit_route_special_chars():
 # Window 管理
 bind = SUPER, T, exec, kitty
 """)
-    assert data[0]["section"] == "Window Management"
+    assert data[0]["section"] == "Windows"
 
 def test_t2_implicit_route_mixed_mode():
     res, data = run_parser_with_content("", """
