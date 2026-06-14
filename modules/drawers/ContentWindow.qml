@@ -20,15 +20,15 @@ StyledWindow {
     readonly property alias interactionWrapper: interactions
 
     readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
-    readonly property bool hasSpecialWorkspace: (monitor?.lastIpcObject.specialWorkspace?.name.length ?? 0) > 0
-    readonly property bool hasFullscreenOnNormalWs: monitor?.activeWorkspace?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1) ?? false
+    readonly property bool hasSpecialWorkspace: (monitor?.lastIpcObject?.specialWorkspace?.name?.length ?? 0) > 0
+    readonly property bool hasFullscreenOnNormalWs: monitor?.activeWorkspace?.toplevels?.values?.some(t => t?.lastIpcObject?.fullscreen > 1) ?? false
     readonly property bool hasFullscreen: {
         if (hasSpecialWorkspace) {
-            const specialName = monitor?.lastIpcObject.specialWorkspace?.name;
+            const specialName = monitor?.lastIpcObject?.specialWorkspace?.name;
             if (!specialName)
                 return false;
             const specialWs = Hypr.workspaces.values.find(ws => ws.name === specialName);
-            return specialWs?.toplevels.values.some(t => t.lastIpcObject.fullscreen > 1) ?? false;
+            return specialWs?.toplevels?.values?.some(t => t?.lastIpcObject?.fullscreen > 1) ?? false;
         }
         return hasFullscreenOnNormalWs;
     }
@@ -46,7 +46,7 @@ StyledWindow {
         if (focusGrab.active || panels.popouts.isDetached)
             return 0;
 
-        if (monitor?.lastIpcObject.specialWorkspace?.name || monitor?.activeWorkspace.lastIpcObject.windows > 0)
+        if (monitor?.lastIpcObject?.specialWorkspace?.name || monitor?.activeWorkspace?.lastIpcObject?.windows > 0)
             return 0;
 
         const thresholds = [];
@@ -118,12 +118,14 @@ StyledWindow {
              || (!root.contentItem.Config.dashboard.showOnHover && visibilities.dashboard && root.contentItem.Config.dashboard.enabled)
              || (visibilities.dashboard && visibilities.dashboardFocused && root.contentItem.Config.dashboard.enabled)
              || (panels.popouts.currentName.startsWith("traymenu") && (panels.popouts.current as StackView)?.depth > 1)
+             || visibilities.cheatsheet
         windows: [root]
         onCleared: {
             visibilities.launcher = false;
             visibilities.session = false;
             visibilities.sidebar = false;
             visibilities.dashboard = false;
+            visibilities.cheatsheet = false;
             panels.popouts.hasCurrent = false;
             bar.closeTray();
         }
@@ -131,7 +133,7 @@ StyledWindow {
 
     StyledRect {
         anchors.fill: parent
-        opacity: (visibilities.session && Config.session.enabled) || panels.popouts.detachedMode !== "" ? 0.5 : 0
+        opacity: (visibilities.session && Config.session.enabled) || visibilities.cheatsheet || panels.popouts.detachedMode !== "" ? 0.5 : 0
         color: Colours.palette.m3scrim
 
         Behavior on opacity {
@@ -181,6 +183,19 @@ StyledWindow {
 
             panel: panels.launcher
             deformAmount: 0.1
+        }
+
+        PanelBg {
+            id: cheatsheetBg
+
+            panel: panels.cheatsheet
+            deformAmount: 0.05
+            visible: panel.visible
+
+            implicitWidth: (visible ? panel.width : 0) * panel.opacity
+            implicitHeight: (visible ? panel.height : 0) * panel.opacity
+            x: panel.x + bar.implicitWidth + (panel.width - implicitWidth) / 2
+            y: panel.y + root.borderThickness + (panel.height - implicitHeight) / 2
         }
 
         PanelBg {
@@ -276,6 +291,9 @@ StyledWindow {
             }
             launcher.transform: Matrix4x4 {
                 matrix: launcherBg.deformMatrix
+            }
+            cheatsheet.transform: Matrix4x4 {
+                matrix: cheatsheetBg.deformMatrix
             }
             session.transform: Matrix4x4 {
                 matrix: sessionBg.deformMatrix

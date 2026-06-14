@@ -12,6 +12,7 @@ import qs.modules.sidebar as Sidebar
 import qs.modules.utilities as Utilities
 import qs.modules.bar.popouts as BarPopouts
 import qs.modules.utilities.toasts as Toasts
+import qs.modules.cheatsheet as Cheatsheet
 
 Item {
     id: root
@@ -33,6 +34,7 @@ Item {
     readonly property alias utilities: utilities
     readonly property alias toasts: toasts
     readonly property alias sidebar: sidebar
+    readonly property alias cheatsheet: cheatsheet
 
     anchors.fill: parent
     anchors.margins: borderThickness
@@ -152,5 +154,13 @@ Item {
         anchors.bottom: utilities.top
         anchors.right: parent.right
         anchors.topMargin: -notifications.anchors.topMargin
+    }
+
+    Cheatsheet.Wrapper {
+        id: cheatsheet
+
+        visibilities: root.visibilities
+
+        anchors.centerIn: parent
     }
 }

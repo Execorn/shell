@@ -8,6 +8,7 @@ PersistentProperties {
     property bool dashboard
     property bool utilities
     property bool sidebar
+    property bool cheatsheet
     property bool dashboardFocused: false
 
     onDashboardChanged: {

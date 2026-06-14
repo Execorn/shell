@@ -46,17 +46,17 @@ Singleton {
     }
 
     function cycleSpecialWorkspace(direction: string): void {
-        const openSpecials = workspaces.values.filter(w => w.name.startsWith("special:") && w.lastIpcObject.windows > 0);
+        const openSpecials = workspaces.values.filter(w => w.name.startsWith("special:") && w.lastIpcObject?.windows > 0);
 
         if (openSpecials.length === 0)
             return;
 
-        const activeSpecial = focusedMonitor.lastIpcObject.specialWorkspace.name ?? "";
+        const activeSpecial = focusedMonitor?.lastIpcObject?.specialWorkspace?.name ?? "";
 
         if (!activeSpecial) {
             if (lastSpecialWorkspace) {
                 const workspace = workspaces.values.find(w => w.name === lastSpecialWorkspace);
-                if (workspace && workspace.lastIpcObject.windows > 0) {
+                if (workspace && workspace.lastIpcObject?.windows > 0) {
                     dispatch(`workspace ${lastSpecialWorkspace}`);
                     return;
                 }
@@ -160,7 +160,7 @@ Singleton {
 
     Connections {
         function onLastIpcObjectChanged(): void {
-            const specialName = root.focusedMonitor.lastIpcObject.specialWorkspace.name;
+            const specialName = root.focusedMonitor?.lastIpcObject?.specialWorkspace?.name;
 
             if (specialName && specialName.startsWith("special:")) {
                 root.lastSpecialWorkspace = specialName;
@@ -213,7 +213,7 @@ Singleton {
         }
 
         function listSpecialWorkspaces(): string {
-            return root.workspaces.values.filter(w => w.name.startsWith("special:") && w.lastIpcObject.windows > 0).map(w => w.name).join("\n");
+            return root.workspaces.values.filter(w => w.name.startsWith("special:") && w.lastIpcObject?.windows > 0).map(w => w.name).join("\n");
         }
 
         target: "hypr"
@@ -316,7 +316,7 @@ Singleton {
                     
                     // Focus c1 if the active window is not one of them
                     const activeT = root.activeToplevel;
-                    const activeAddr = activeT ? activeT.lastIpcObject.address : "";
+                    const activeAddr = activeT?.lastIpcObject?.address ?? "";
                     if (activeAddr !== c1.address && activeAddr !== c2.address) {
                         root.dispatch("focuswindow address:" + c1.address);
                     }

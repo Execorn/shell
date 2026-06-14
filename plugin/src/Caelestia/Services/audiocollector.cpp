@@ -9,6 +9,7 @@
 #include <spa/param/latency-utils.h>
 #include <stop_token>
 #include <vector>
+#include <chrono>
 
 Q_LOGGING_CATEGORY(lcAc, "caelestia.services.ac", QtInfoMsg)
 Q_LOGGING_CATEGORY(lcAcWorker, "caelestia.services.ac.worker", QtInfoMsg)
@@ -248,7 +249,12 @@ void AudioCollector::start() {
     clearBuffer();
 
     m_thread = std::jthread([this](std::stop_token token) {
-        PipeWireWorker worker(token, this);
+        while (!token.stop_requested()) {
+            PipeWireWorker worker(token, this);
+            if (!token.stop_requested()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
+        }
     });
 }
 
