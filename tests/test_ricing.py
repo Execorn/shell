@@ -83,12 +83,16 @@ class OverrideMockProcess(QObject):
     runningChanged = Signal(bool)
     commandChanged = Signal()
     stdoutChanged = Signal('QVariant')
+    stderrChanged = Signal('QVariant')
+    exitCodeChanged = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._running = False
         self._command = []
         self._stdout = None
+        self._stderr = None
+        self._exitCode = 0
         self._skip_run = False
 
     @Property('QVariant', notify=stdoutChanged)
@@ -97,6 +101,20 @@ class OverrideMockProcess(QObject):
     def stdout(self, val):
         self._stdout = val
         self.stdoutChanged.emit(val)
+
+    @Property('QVariant', notify=stderrChanged)
+    def stderr(self): return self._stderr
+    @stderr.setter
+    def stderr(self, val):
+        self._stderr = val
+        self.stderrChanged.emit(val)
+
+    @Property(int, notify=exitCodeChanged)
+    def exitCode(self): return self._exitCode
+    @exitCode.setter
+    def exitCode(self, val):
+        self._exitCode = val
+        self.exitCodeChanged.emit(val)
 
     @Property(bool)
     def skip_run(self): return self._skip_run
@@ -116,11 +134,20 @@ class OverrideMockProcess(QObject):
                     import subprocess
                     try:
                         res = subprocess.run([str(x) for x in self._command], capture_output=True, text=True)
+                        self._exitCode = res.returncode
+                        self.exitCodeChanged.emit(res.returncode)
                         if self._stdout:
                             self._stdout.setProperty("text", res.stdout)
                             if hasattr(self._stdout, "streamFinished"):
                                 try:
                                     self._stdout.streamFinished.emit()
+                                except RuntimeError:
+                                    pass
+                        if self._stderr:
+                            self._stderr.setProperty("text", res.stderr)
+                            if hasattr(self._stderr, "streamFinished"):
+                                try:
+                                    self._stderr.streamFinished.emit()
                                 except RuntimeError:
                                     pass
                     except Exception as e:
@@ -1550,6 +1577,8 @@ def test_t1_r6_ocr_start_ocr(ricing_suite):
     ocr = engine.singletonInstance("qs.services", "Ocr")
     ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()
     ocrProcess.setProperty("skip_run", True)
+    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
+    screenshotProcess.setProperty("skip_run", True)
     call_method(engine, ocr, "startOcr")
     assert get_property(engine, ocr, "running").toVariant() is True
 
@@ -1559,6 +1588,10 @@ def test_t1_r6_ocr_capture_success(ricing_suite, qapp):
     
     pathlib.Path("/tmp/mock_ocr_text.txt").write_text("Hello Screen Text")
     call_method(engine, ocr, "startOcr")
+    qapp.processEvents()
+    
+    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
+    screenshotProcess.setProperty("running", True)
     qapp.processEvents()
     
     ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()
@@ -1602,12 +1635,33 @@ def test_t1_r6_ocr_error_handling(ricing_suite, qapp):
     call_method(engine, ocr, "startOcr")
     qapp.processEvents()
     
+    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
+    screenshotProcess.setProperty("running", True)
+    qapp.processEvents()
+    
     ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()
     ocrProcess.setProperty("running", True)
     qapp.processEvents()
     
     assert get_property(engine, ocr, "ocrText").toVariant() == ""
     assert "No text detected" in get_property(engine, ocr, "lastError").toVariant()
+
+def test_t2_r6_ocr_screenshot_cancelled(ricing_suite, qapp):
+    engine = ricing_suite["engine"]
+    ocr = engine.singletonInstance("qs.services", "Ocr")
+    
+    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
+    screenshotProcess.setProperty("skip_run", True)
+    screenshotProcess.setProperty("exitCode", 1)
+    
+    call_method(engine, ocr, "startOcr")
+    qapp.processEvents()
+    
+    screenshotProcess.setProperty("running", False)
+    qapp.processEvents()
+    
+    assert get_property(engine, ocr, "running").toVariant() is False
+    assert "cancelled or failed" in get_property(engine, ocr, "lastError").toVariant()
 
 
 # ==========================================
@@ -2036,6 +2090,10 @@ def test_t4_ocr_translate_explain_workflow(ricing_suite, qapp):
     
     pathlib.Path("/tmp/mock_ocr_text.txt").write_text("Hello world")
     call_method(engine, ocr, "startOcr")
+    qapp.processEvents()
+    
+    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
+    screenshotProcess.setProperty("running", True)
     qapp.processEvents()
     
     ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()

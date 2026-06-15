@@ -26,8 +26,24 @@ Singleton {
         onTriggered: root.startProcess()
     }
 
+    readonly property Process screenshotProcess: Process {
+        command: ["sh", "-c", "geom=$(slurp) && grim -g \"$geom\" " + tempPath]
+        onRunningChanged: {
+            if (!running) {
+                if (exitCode === 0) {
+                    ocrProcess.running = false;
+                    ocrProcess.running = true;
+                } else {
+                    root.running = false;
+                    root.lastError = "Screenshot selection cancelled or failed.";
+                    root.restoreDrawer();
+                }
+            }
+        }
+    }
+
     readonly property Process ocrProcess: Process {
-        command: ["sh", "-c", "geom=$(slurp) && grim -g \"$geom\" " + tempPath + " && tesseract " + tempPath + " stdout -l eng 2>/dev/null | wl-copy && wl-paste"]
+        command: ["sh", "-c", "tesseract " + tempPath + " stdout -l eng 2>/dev/null | wl-copy && wl-paste"]
         stdout: StdioCollector {
             onStreamFinished: {
                 root.running = false;
@@ -36,23 +52,26 @@ Singleton {
                     root.ocrText = result;
                     Toaster.toast(qsTr("OCR Completed"), qsTr("Text copied to clipboard (%1 chars)").arg(result.length), "content_copy");
                 } else {
-                    root.lastError = "No text detected, or operation cancelled.";
+                    root.lastError = "No text detected.";
                 }
-
-                if (root.activeDrawer !== "") {
-                    const vis = Visibilities.getForActive();
-                    if (vis) {
-                        vis[root.activeDrawer] = true;
-                    }
-                    root.activeDrawer = "";
-                }
+                root.restoreDrawer();
             }
         }
     }
 
+    function restoreDrawer(): void {
+        if (root.activeDrawer !== "") {
+            const vis = Visibilities.getForActive();
+            if (vis) {
+                vis[root.activeDrawer] = true;
+            }
+            root.activeDrawer = "";
+        }
+    }
+
     function startProcess(): void {
-        ocrProcess.running = false;
-        ocrProcess.running = true;
+        screenshotProcess.running = false;
+        screenshotProcess.running = true;
     }
 
     function startOcr(): void {

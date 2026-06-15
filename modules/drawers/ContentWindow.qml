@@ -237,6 +237,7 @@ StyledWindow {
             id: notifsBg
 
             panel: panels.notifications
+            group: null
         }
 
         PanelBg {
