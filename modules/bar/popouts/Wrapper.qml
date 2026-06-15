@@ -110,8 +110,10 @@ Item {
         shouldBeActive: root.hasCurrent && !root.detachedMode
         anchors.fill: parent
 
-        sourceComponent: Content {
-            popouts: popoutState
+        sourceComponent: Component {
+            Content {
+                popouts: popoutState
+            }
         }
     }
 
@@ -121,9 +123,11 @@ Item {
         shouldBeActive: root.detachedMode === "winfo"
         anchors.centerIn: parent
 
-        sourceComponent: WindowInfo {
-            screen: root.screen
-            client: Hypr.activeToplevel
+        sourceComponent: Component {
+            WindowInfo {
+                screen: root.screen
+                client: Hypr.activeToplevel
+            }
         }
     }
 

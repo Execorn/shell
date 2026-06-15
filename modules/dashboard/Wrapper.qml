@@ -49,10 +49,12 @@ Item {
 
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Content {
-            visibilities: root.visibilities
-            dashState: root.dashState
-            facePicker: root.facePicker
+        sourceComponent: Component {
+            Content {
+                visibilities: root.visibilities
+                dashState: root.dashState
+                facePicker: root.facePicker
+            }
         }
     }
 }
