@@ -7,14 +7,14 @@
 //@ pragma DefaultEnv QT_QUICK_BACKEND=opengl
 //@ pragma DefaultEnv QSG_INFO=1
 
+import QtQuick
+import Quickshell
 import "modules"
 import "modules/drawers"
 import "modules/background"
 import "modules/areapicker"
 import "modules/lock"
 import "modules/overview"
-import Quickshell
-import QtQuick
 
 import qs.services
 
