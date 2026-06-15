@@ -46,6 +46,4 @@ ShellRoot {
     IdleMonitors {
         lock: lock
     }
-
 }
-
