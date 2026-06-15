@@ -129,11 +129,18 @@ StyledRect {
         }
     }
 
+    Process {
+        id: parseProcess
+        command: ["python3", "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"]
+        running: false
+    }
+
     Connections {
         function onCheatsheetChanged(): void {
             if (root.visibilities.cheatsheet) {
                 searchInput.text = "";
                 searchInput.forceActiveFocus();
+                parseProcess.running = true;
             }
         }
         target: root.visibilities

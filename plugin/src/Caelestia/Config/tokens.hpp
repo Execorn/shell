@@ -259,7 +259,7 @@ class SidebarTokens : public ConfigObject {
     Q_OBJECT
     QML_ANONYMOUS
 
-    CONFIG_PROPERTY(int, width, 430)
+    CONFIG_PROPERTY(int, width, 520)
 
 public:
     explicit SidebarTokens(QObject* parent = nullptr)

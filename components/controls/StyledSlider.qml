@@ -164,6 +164,7 @@ Slider {
         anchors.verticalCenter: parent.verticalCenter
 
         preventStealing: true
+        height: implicitHeight
         implicitHeight: handle.implicitHeight
 
         onPressed: e => {

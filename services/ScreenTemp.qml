@@ -17,14 +17,14 @@ Singleton {
     onTemperatureChanged: debounceTimer.restart()
 
     Component.onCompleted: {
-        proc.command = ["wlsunset", "-t", root.temperature.toString()];
+        proc.command = ["wlsunset", "-t", root.temperature.toString(), "-T", root.temperature.toString(), "-l", "0", "-L", "0"];
         proc.running = root.active;
     }
 
     Process {
         id: proc
 
-        command: ["wlsunset", "-t", "4000"]
+        command: ["wlsunset", "-t", "4000", "-T", "4000", "-l", "0", "-L", "0"]
         running: false
     }
 
@@ -38,7 +38,7 @@ Singleton {
             if (proc.running) {
                 proc.running = false;
             }
-            proc.command = ["wlsunset", "-t", root.temperature.toString()];
+            proc.command = ["wlsunset", "-t", root.temperature.toString(), "-T", root.temperature.toString(), "-l", "0", "-L", "0"];
             proc.running = root.active;
         }
     }

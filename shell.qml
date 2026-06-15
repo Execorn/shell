@@ -39,6 +39,9 @@ ShellRoot {
     Component.onCompleted: {
         let _ = PluginManager;
         let _2 = Hypr;
+        let _3 = Ocr;
+        let _4 = Players;
+        let _5 = Notifs;
     }
 }
 

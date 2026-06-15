@@ -43,7 +43,7 @@ def test_screentemp_service(qml_engine):
     assert screentemp.property("active") is False
     assert screentemp.property("temperature") == 4000
 
-    assert list(process.property("command")) == ["wlsunset", "-t", "4000"]
+    assert list(process.property("command")) == ["wlsunset", "-t", "4000", "-T", "4000", "-l", "0", "-L", "0"]
     assert process.property("running") is False
 
     # Test toggling active
@@ -60,7 +60,7 @@ def test_screentemp_service(qml_engine):
     # Test updating temperature updates process command
     screentemp.setProperty("temperature", 3000)
     QTest.qWait(400)
-    assert list(process.property("command")) == ["wlsunset", "-t", "3000"]
+    assert list(process.property("command")) == ["wlsunset", "-t", "3000", "-T", "3000", "-l", "0", "-L", "0"]
     assert process.property("running") is (False if is_override else True)
 
     # Clean up property

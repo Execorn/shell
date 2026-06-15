@@ -12,7 +12,6 @@ import qs.components.controls
 import qs.components.effects
 import qs.services
 import qs.utils
-import qs.modules.dashboard.dash
 
 Item {
     id: root
@@ -49,10 +48,6 @@ Item {
 
             target: modelData
         }
-    }
-
-    DashboardState {
-        id: calState
     }
 
     StyledFlickable {
@@ -410,23 +405,6 @@ Item {
                 }
             }
 
-            SectionHeader {
-                title: qsTr("Calendar")
-            }
-
-            // Calendar Widget
-            Item {
-                Layout.fillWidth: true
-                implicitHeight: calendarWidget.implicitHeight
-
-                Calendar {
-                    id: calendarWidget
-
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    dashState: calState
-                }
-            }
         }
     }
 }

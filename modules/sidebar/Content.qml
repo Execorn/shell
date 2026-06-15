@@ -22,7 +22,7 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.55
+            Layout.preferredHeight: parent.height * 0.65
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
@@ -106,7 +106,7 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.45
+            Layout.preferredHeight: parent.height * 0.35
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
