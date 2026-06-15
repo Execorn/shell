@@ -33,7 +33,7 @@ shutil.rmtree(base_import_path, ignore_errors=True)
 
 mocks = {
     'Quickshell': {
-        'qmldir': 'module Quickshell\nSingleton 1.0 Singleton.qml\nIpcHandler 1.0 IpcHandler.qml\nScope 1.0 Scope.qml\nLazyLoader 1.0 LazyLoader.qml\nVariants 1.0 Variants.qml\nShellScreen 1.0 ShellScreen.qml\nScriptModel 1.0 ScriptModel.qml\nClippingRectangle 1.0 ClippingRectangle.qml\nTransformWatcher 1.0 TransformWatcher.qml\nNotifData 1.0 NotifData.qml\n',
+        'qmldir': 'module Quickshell\nSingleton 1.0 Singleton.qml\nIpcHandler 1.0 IpcHandler.qml\nScope 1.0 Scope.qml\nLazyLoader 1.0 LazyLoader.qml\nVariants 1.0 Variants.qml\nShellScreen 1.0 ShellScreen.qml\nScriptModel 1.0 ScriptModel.qml\nClippingRectangle 1.0 ClippingRectangle.qml\nTransformWatcher 1.0 TransformWatcher.qml\nNotifData 1.0 NotifData.qml\nRegion 1.0 Region.qml\nPanelWindow 1.0 PanelWindow.qml\nPersistentProperties 1.0 PersistentProperties.qml\n',
         'Singleton.qml': 'import QtQuick\nQtObject {\n    default property var children\n}\n',
         'IpcHandler.qml': 'import QtQuick\nQtObject {\n    property string target: \"\"\n}\n',
         'Scope.qml': 'import QtQuick\nItem {\n    default property var data\n}\n',
@@ -43,29 +43,36 @@ mocks = {
         'ScriptModel.qml': 'import QtQuick\nListModel {\n    property var values: []\n    onValuesChanged: {\n        clear();\n        if (values) {\n            for (var i = 0; i < values.length; i++) {\n                append({"modelData": values[i]});\n            }\n        }\n    }\n}\n',
         'ClippingRectangle.qml': 'import QtQuick\nRectangle {}\n',
         'TransformWatcher.qml': 'import QtQuick\nQtObject {\n    property var target\n    property var a\n    property var b\n    property var transform\n}\n',
-        'NotifData.qml': 'import QtQuick\nQtObject {\n    property var actions: []\n    property string body: ""\n    property bool resident: false\n    property bool hasActionIcons: false\n    signal close()\n}\n'
+        'NotifData.qml': 'import QtQuick\nQtObject {\n    property var actions: []\n    property string body: ""\n    property bool resident: false\n    property bool hasActionIcons: false\n    signal close()\n}\n',
+        'Region.qml': 'import QtQuick\nQtObject {}\n',
+        'PanelWindow.qml': 'import QtQuick\nItem {\n    property color color: "transparent"\n    property var mask\n}\n',
+        'PersistentProperties.qml': 'import QtQuick\nQtObject {\n    property string reloadableId: ""\n}\n'
     },
     'Quickshell/Io': {
-        'qmldir': 'module Quickshell.Io\n',
+        'qmldir': 'module Quickshell.Io\nFileView 1.0 FileView.qml\n',
+        'FileView.qml': 'import QtQuick\nItem {\n    enum Error {\n        FileNotFound\n    }\n    property bool printErrors: false\n    property string path: ""\n    property bool watchChanges: false\n    signal loaded()\n    signal loadFailed(int err)\n    function text() { return "[]"; }\n    function setText(t) {}\n}\n'
     },
     'Quickshell/Services/Pipewire': {
         'qmldir': 'module Quickshell.Services.Pipewire\nPwObjectTracker 1.0 PwObjectTracker.qml\n',
         'PwObjectTracker.qml': 'import QtQuick\nItem {\n    property var objects: []\n}\n'
     },
     'Quickshell/Services/Notifications': {
-        'qmldir': 'module Quickshell.Services.Notifications\nDummyNotif 1.0 DummyNotif.qml\nNotifData 1.0 NotifData.qml\n',
+        'qmldir': 'module Quickshell.Services.Notifications\nDummyNotif 1.0 DummyNotif.qml\nNotifData 1.0 NotifData.qml\nNotificationServer 1.0 NotificationServer.qml\nNotification 1.0 Notification.qml\n',
         'DummyNotif.qml': 'import QtQuick\nItem {}\n',
-        'NotifData.qml': 'import QtQuick\nQtObject {}\n'
+        'NotifData.qml': 'import QtQuick\nQtObject {}\n',
+        'NotificationServer.qml': 'import QtQuick\nItem {\n    property bool keepOnReload: false\n    property bool actionsSupported: false\n    property bool bodyHyperlinksSupported: false\n    property bool bodyImagesSupported: false\n    property bool bodyMarkupSupported: false\n    property bool imageSupported: false\n    property bool persistenceSupported: false\n    signal notification(var notif)\n}\n',
+        'Notification.qml': 'import QtQuick\nQtObject {\n    property string id: ""\n    property string summary: ""\n    property string body: ""\n    property string appIcon: ""\n    property string appName: ""\n    property string image: ""\n    property real expireTimeout: 0\n    property var hints: ({})\n    property int urgency: 0\n    property bool resident: false\n    property bool hasActionIcons: false\n    property list<var> actions: []\n    signal closed()\n    signal summaryChanged()\n    signal bodyChanged()\n    signal appIconChanged()\n    signal appNameChanged()\n    signal imageChanged()\n    signal expireTimeoutChanged()\n    signal urgencyChanged()\n    signal residentChanged()\n    signal hasActionIconsChanged()\n    signal actionsChanged()\n    signal hintsChanged()\n    function dismiss() {}\n}\n'
     },
     'Caelestia': {
         'qmldir': 'module Caelestia\nDummy 1.0 Dummy.qml\n',
         'Dummy.qml': 'import QtQuick\nItem {}\n',
-        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true\n        }\n    })\n}\n',
+        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true\n        }\n    })\n    property var notifs: ({\n        defaultExpireTimeout: 5000,\n        fullscreenExpireTimeout: 10000,\n        expire: true\n    })\n}\n',
         'Tokens.qml': 'import QtQuick\nQtObject {\n    property var padding: ({\n        medium: 12.0,\n        extraSmall: 4.0\n    })\n    property var spacing: ({\n        medium: 8.0,\n        small: 4.0\n    })\n    property var rounding: ({\n        full: 9999.0,\n        medium: 8.0,\n        small: 4.0\n    })\n    property var anim: ({\n        durations: {\n            normal: 200,\n            fast: 100,\n            slow: 300\n        }\n    })\n    property var font: ({\n        body: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        title: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        headline: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        label: {\n            large: {\n                weight: function(w) { return this; },\n                build: function() { return "Google Sans"; }\n            },\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        }\n    })\n}\n',
         'Colours.qml': 'import QtQuick\nQtObject {\n    property var palette: ({\n        m3primaryContainer: "#000000",\n        m3onPrimaryContainer: "#ffffff"\n    })\n    property var tPalette: ({\n        m3surfaceContainerLow: "#000000",\n        m3surfaceContainer: "#000000",\n        m3outline: "#000000",\n        m3outlineVariant: "#000000"\n    })\n}\n'
     },
     'Caelestia/Config': {
-        'qmldir': 'module Caelestia.Config\n',
+        'qmldir': 'module Caelestia.Config\nsingleton TokenConfig 1.0 TokenConfig.qml\n',
+        'TokenConfig.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    readonly property var sizes: ({\n        notifs: {\n            image: 48\n        }\n    })\n}\n'
     },
     'Caelestia/Services': {
         'qmldir': 'module Caelestia.Services\nCavaProvider 1.0 CavaProvider.qml\nBeatTracker 1.0 BeatTracker.qml\n',
@@ -81,7 +88,7 @@ mocks = {
         'Screens.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    id: root\n    property var screens: [\n        {\n            name: "DP-1",\n            x: 0,\n            y: 0,\n            width: 1920,\n            height: 1080\n        }\n    ]\n}\n',
         'Weather.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property string city: "Mock City"\n    property string temp: "20°C"\n    property string icon: "cloudy"\n    property string description: "Partly Cloudy"\n    signal fetchCoordsFromCity(string cityName)\n}\n',
         'Nmcli.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property bool wifiEnabled: true\n    property var active: QtObject { property string ssid: "Mock-Wifi" }\n    property var networks: []\n    signal enableWifi(bool checked)\n}\n',
-        'Notifs.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property var list: []\n    property bool dnd: false\n}\n',
+        'Notifs.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property var list: []\n    property bool dnd: false\n    property string mutedAppsJson: "{}"\n    function isAppMuted(appName) { return false; }\n    function muteApp(appName, hours) {}\n    function unmuteApp(appName) {}\n}\n',
     },
     'qs/components': {
         'qmldir': 'module qs.components\nStyledText 1.0 StyledText.qml\nStyledRect 1.0 StyledRect.qml\nDashboardState 1.0 DashboardState.qml\nSectionHeader 1.0 SectionHeader.qml\nMaterialIcon 1.0 MaterialIcon.qml\nAnim 1.0 Anim.qml\nStyledClippingRect 1.0 StyledClippingRect.qml\nDrawerVisibilities 1.0 DrawerVisibilities.qml\n',
@@ -95,18 +102,22 @@ mocks = {
         'DrawerVisibilities.qml': 'import QtQuick\nQtObject {\n    property bool bar: false\n    property bool osd: false\n    property bool session: false\n    property bool launcher: false\n    property bool dashboard: false\n    property bool utilities: false\n    property bool sidebar: false\n    property bool cheatsheet: false\n    property bool dashboardFocused: false\n}\n'
     },
     'qs/components/controls': {
-        'qmldir': 'module qs.components.controls\nStyledRadioButton 1.0 StyledRadioButton.qml\nStyledSlider 1.0 StyledSlider.qml\nIconTextButton 1.0 IconTextButton.qml\nCustomMouseArea 1.0 CustomMouseArea.qml\nIconButton 1.0 IconButton.qml\nButtonBase 1.0 ButtonBase.qml\nTextButton 1.0 TextButton.qml\nStyledScrollBar 1.0 StyledScrollBar.qml\nLoadingIndicator 1.0 LoadingIndicator.qml\nStyledInputField 1.0 StyledInputField.qml\nSwitchRow 1.0 SwitchRow.qml\n',
+        'qmldir': 'module qs.components.controls\nStyledRadioButton 1.0 StyledRadioButton.qml\nStyledSlider 1.0 StyledSlider.qml\nIconTextButton 1.0 IconTextButton.qml\nCustomMouseArea 1.0 CustomMouseArea.qml\nIconButton 1.0 IconButton.qml\nButtonBase 1.0 ButtonBase.qml\nTextButton 1.0 TextButton.qml\nStyledScrollBar 1.0 StyledScrollBar.qml\nLoadingIndicator 1.0 LoadingIndicator.qml\nStyledInputField 1.0 StyledInputField.qml\nSwitchRow 1.0 SwitchRow.qml\nStyledSwitch 1.0 StyledSwitch.qml\nSplitButton 1.0 SplitButton.qml\nMenuItem 1.0 MenuItem.qml\nMenu 1.0 Menu.qml\n',
         'StyledRadioButton.qml': 'import QtQuick\nimport QtQuick.Controls\nRadioButton {\n    property var modelData: null\n}\n',
         'StyledSlider.qml': 'import QtQuick\nimport QtQuick.Controls\nSlider {\n    signal interaction(real value)\n}\n',
         'IconTextButton.qml': 'import QtQuick\nItem {\n    property string icon: \"\"\n    property string text: \"\"\n    property var inactiveColour: null\n    property var inactiveOnColour: null\n    property var verticalPadding: null\n    property bool disabled: false\n    signal clicked()\n}\n',
         'CustomMouseArea.qml': 'import QtQuick\nItem {\n    signal wheel(var event)\n    function simulateWheel(y) {\n        wheel({ angleDelta: { y: y } });\n    }\n}\n',
-        'IconButton.qml': 'import QtQuick\nItem {\n    property string icon: \"\"\n    property int type: 0\n    property var font\n    property var stateLayer: Item { property bool containsMouse: false }\n    signal clicked()\n}\n',
+        'IconButton.qml': 'import QtQuick\nimport qs.components\nimport qs.components.effects\nItem {\n    property string icon: \"\"\n    property int type: 0\n    property var font\n    property alias stateLayer: internalStateLayer\n    property alias label: internalLabel\n    property color inactiveColour\n    property color inactiveOnColour\n    property bool shapeMorph\n    property bool isRound\n    property bool isToggle\n    property bool checked\n    property bool internalChecked\n    signal clicked()\n    StateLayer {\n        id: internalStateLayer\n        property bool containsMouse: false\n    }\n    MaterialIcon {\n        id: internalLabel\n    }\n}\n',
         'ButtonBase.qml': 'import QtQuick\nItem {\n    property bool disabled: false\n    enum Type {\n        Filled,\n        Tonal,\n        Text\n    }\n    enum ButtonType {\n        Filled,\n        Tonal,\n        Text\n    }\n}\n',
         'TextButton.qml': 'import QtQuick\nimport qs.components.controls\nButtonBase {\n    property string text: \"\"\n    property int type: 0\n    signal clicked()\n}\n',
         'StyledScrollBar.qml': 'import QtQuick.Controls\nScrollBar {\n    property var flickable: null\n}',
         'LoadingIndicator.qml': 'import QtQuick\nItem {\n    property bool animated: false\n}',
         'StyledInputField.qml': 'import QtQuick\nItem {\n    property string text: \"\"\n    property string placeholderText: \"\"\n    signal editingFinished()\n    function clear() {\n        text = \"\"\n    }\n}',
         'SwitchRow.qml': 'import QtQuick\nimport QtQuick.Controls\nRow {\n    property string label: \"\"\n    property bool checked: false\n    signal toggled(bool checked)\n    Switch {\n        checked: parent.checked\n        onCheckedChanged: parent.toggled(checked)\n    }\n}',
+        'StyledSwitch.qml': 'import QtQuick\nimport QtQuick.Controls\nSwitch {}',
+        'SplitButton.qml': 'import QtQuick\nRow {\n    enum Type {\n        Filled,\n        Tonal\n    }\n    property int type: SplitButton.Filled\n    property bool disabled\n    property list<QtObject> menuItems\n    property var active\n    property bool expanded\n    property Menu menu: Menu {}\n}',
+        'MenuItem.qml': 'import QtQuick\nQtObject {\n    property string text: \"\"\n    property string icon: \"\"\n    property string trailingIcon: \"\"\n    property string activeIcon: icon\n    property string activeText: text\n    signal clicked()\n}',
+        'Menu.qml': 'import QtQuick\nItem {\n    property list<QtObject> items\n    property var active\n    property bool expanded\n    signal itemSelected(var item)\n}',
     },
     'qs/components/effects': {
         'qmldir': 'module qs.components.effects\nStateLayer 1.0 StateLayer.qml\nColouriser 1.0 Colouriser.qml\nElevation 1.0 Elevation.qml\nColouredIcon 1.0 ColouredIcon.qml\nMask 1.0 Mask.qml\n',
@@ -117,19 +128,21 @@ mocks = {
         'Mask.qml': 'import QtQuick\nItem {\n    property bool maskEnabled: true\n    property var maskSource\n    property var maskSpreadAtMin: 1\n    property var maskThresholdMin: 0.5\n}\n'
     },
     'Quickshell/Widgets': {
-        'qmldir': 'module Quickshell.Widgets\nDummyWidget 1.0 DummyWidget.qml\nIconImage 1.0 IconImage.qml\n',
+        'qmldir': 'module Quickshell.Widgets\nDummyWidget 1.0 DummyWidget.qml\nIconImage 1.0 IconImage.qml\nWrapperMouseArea 1.0 WrapperMouseArea.qml\n',
         'DummyWidget.qml': 'import QtQuick\nItem {}\n',
-        'IconImage.qml': 'import QtQuick\nImage {}\n'
+        'IconImage.qml': 'import QtQuick\nImage {}\n',
+        'WrapperMouseArea.qml': 'import QtQuick\nMouseArea {}\n',
     },
     'Quickshell/Bluetooth': {
         'qmldir': 'module Quickshell.Bluetooth\nDummyBt 1.0 DummyBt.qml\n',
         'DummyBt.qml': 'import QtQuick\nItem {}\n',
     },
     'qs/components/containers': {
-        'qmldir': 'module qs.components.containers\nStyledWindow 1.0 StyledWindow.qml\nStyledFlickable 1.0 StyledFlickable.qml\nWindowAnchors 1.0 WindowAnchors.qml\n',
+        'qmldir': 'module qs.components.containers\nStyledWindow 1.0 StyledWindow.qml\nStyledFlickable 1.0 StyledFlickable.qml\nWindowAnchors 1.0 WindowAnchors.qml\nStyledListView 1.0 StyledListView.qml\n',
         'StyledWindow.qml': 'import QtQuick\nQtObject {\n    id: root\n    required property string name\n    property var screen: null\n    property WindowAnchors anchors: WindowAnchors {}\n    property Item dummyItem: Item {\n        id: dummy\n        width: root.screen ? root.screen.width : 1920\n        height: root.screen ? root.screen.height : 1080\n    }\n    property alias width: dummy.width\n    property alias height: dummy.height\n    default property alias data: dummy.data\n}\n',
         'WindowAnchors.qml': 'import QtQuick\nQtObject {\n    property bool top: false\n    property bool bottom: false\n    property bool left: false\n    property bool right: false\n}\n',
         'StyledFlickable.qml': 'import QtQuick\nFlickable {\n    property alias horizontalScrollBar: horiz\n    property alias verticalScrollBar: vert\n    Item { id: horiz }\n    Item { id: vert }\n}\n',
+        'StyledListView.qml': 'import QtQuick\nListView {}\n',
     },
     'qs/components/misc': {
         'qmldir': 'module qs.components.misc\nCustomShortcut 1.0 CustomShortcut.qml\n',
@@ -495,6 +508,20 @@ class MockLazyListView(QQuickItem):
     def qmlAttachedProperties(cls, target):
         return MockLazyListViewAttached(target)
 
+class MockButtonRow(QQuickItem):
+    spacingChanged = Signal(float)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._spacing = 0.0
+
+    @Property(float, notify=spacingChanged)
+    def spacing(self): return self._spacing
+    @spacing.setter
+    def spacing(self, val):
+        self._spacing = val
+        self.spacingChanged.emit(val)
+
 class MockBluetoothAdapter(QObject):
     enabledChanged = Signal(bool)
     def __init__(self, parent=None):
@@ -522,6 +549,15 @@ class MockBluetooth(QObject):
         self._devices = MockBluetoothDevices(self)
     defaultAdapter = Property(QObject, lambda self: self._adapter, notify=defaultAdapterChanged)
     devices = Property(QObject, lambda self: self._devices, notify=devicesChanged)
+
+class MockUrgency(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+    Low = Property(int, lambda self: 0, constant=True)
+    Normal = Property(int, lambda self: 1, constant=True)
+    Critical = Property(int, lambda self: 2, constant=True)
+
+mock_urgency = MockUrgency()
 
 # Mock FileView
 class MockFileView(QObject):
@@ -644,6 +680,8 @@ class MockFileSystemModel(QObject):
         self._recursive = False
         self._filter = 0
         self._entries = []
+        self._nameFilters = []
+        self._sortReverse = False
 
     @Property(str)
     def path(self): return self._path
@@ -660,11 +698,56 @@ class MockFileSystemModel(QObject):
     @filter.setter
     def filter(self, val): self._filter = val
 
+    @Property('QStringList')
+    def nameFilters(self): return self._nameFilters
+    @nameFilters.setter
+    def nameFilters(self, val): self._nameFilters = val
+
+    @Property(bool)
+    def sortReverse(self): return self._sortReverse
+    @sortReverse.setter
+    def sortReverse(self, val): self._sortReverse = val
+
     @Property('QVariantList', notify=entriesChanged)
     def entries(self): return self._entries
     def set_entries(self, val):
         self._entries = val
         self.entriesChanged.emit()
+
+class MockFileSystemEntry(QObject):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._path = ""
+        self._relativePath = ""
+        self._name = ""
+        self._baseName = ""
+        self._parentDir = ""
+        self._suffix = ""
+        self._size = 0
+        self._isDir = False
+        self._isImage = False
+        self._mimeType = ""
+
+    @Property(str)
+    def path(self): return self._path
+    @Property(str)
+    def relativePath(self): return self._relativePath
+    @Property(str)
+    def name(self): return self._name
+    @Property(str)
+    def baseName(self): return self._baseName
+    @Property(str)
+    def parentDir(self): return self._parentDir
+    @Property(str)
+    def suffix(self): return self._suffix
+    @Property(int)
+    def size(self): return self._size
+    @Property(bool)
+    def isDir(self): return self._isDir
+    @Property(bool)
+    def isImage(self): return self._isImage
+    @Property(str)
+    def mimeType(self): return self._mimeType
 
 # Mock ElapsedTimer
 class MockElapsedTimer(QObject):
@@ -1083,12 +1166,14 @@ qmlRegisterType(MockProcess, "Quickshell.Io", 1, 0, "Process")
 qmlRegisterType(MockPwNode, "Quickshell.Services.Pipewire", 1, 0, "PwNode")
 qmlRegisterType(MockPopoutState, "Caelestia.Config", 1, 0, "PopoutState")
 qmlRegisterType(MockLazyListView, "Caelestia.Components", 1, 0, "LazyListView")
+qmlRegisterType(MockButtonRow, "Caelestia.Components", 1, 0, "ButtonRow")
 
 qmlRegisterType(MockFileView, "Quickshell.Io", 1, 0, "FileView")
 qmlRegisterType(MockStdioCollector, "Quickshell.Io", 1, 0, "StdioCollector")
 qmlRegisterType(MockImageAnalyser, "Caelestia", 1, 0, "ImageAnalyser")
 qmlRegisterType(MockElapsedTimer, "Caelestia", 1, 0, "ElapsedTimer")
 qmlRegisterType(MockFileSystemModel, "Caelestia.Models", 1, 0, "FileSystemModel")
+qmlRegisterType(MockFileSystemEntry, "Caelestia.Models", 1, 0, "FileSystemEntry")
 qmlRegisterType(MockHyprExtras, "Caelestia.Internal", 1, 0, "HyprExtras")
 
 qmlRegisterType(MockNotifData, "Quickshell", 1, 0, "NotifData")
@@ -1098,6 +1183,7 @@ qmlRegisterType(MockNotifData, "qs.services", 1, 0, "NotifData")
 
 mock_bt = MockBluetooth()
 qmlRegisterSingletonInstance(MockBluetooth, "Quickshell.Bluetooth", 1, 0, "Bluetooth", mock_bt)
+qmlRegisterSingletonInstance(MockUrgency, "Quickshell.Services.Notifications", 1, 0, "NotificationUrgency", mock_urgency)
 
 @pytest.fixture(scope="session")
 def qapp():
@@ -1120,6 +1206,7 @@ def qapp():
     # Copy Audio.qml and ScreenTemp.qml to isolated services path
     shutil.copy("/home/execorn/ricing/shell/services/Audio.qml", base_import_path / "qs/services/Audio.qml")
     shutil.copy("/home/execorn/ricing/shell/services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
+    shutil.copy("/home/execorn/ricing/shell/services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
 
     # Copy ScreenTemp to global qml-imports (for compatibility)
     global_services = pathlib.Path("/tmp/qml-imports/qs/services")

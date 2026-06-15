@@ -14,6 +14,7 @@ Item {
     id: root
 
     required property NotifData notif
+    property bool showMuteOptions: false
 
     Layout.fillWidth: true
     implicitHeight: flickable.contentHeight
@@ -101,15 +102,35 @@ Item {
             spacing: Tokens.spacing.small
 
             Repeater {
-                model: [
-                    {
-                        isClose: true
-                    },
-                    ...(root.notif?.actions ?? []),
-                    {
-                        isCopy: true
+                model: {
+                    const _dummy = Notifs.mutedAppsJson;
+
+                    if (showMuteOptions) {
+                        return [
+                            { isBack: true },
+                            { isMuteOption: true, hours: 1, text: qsTr("Mute 1h") },
+                            { isMuteOption: true, hours: 24, text: qsTr("Mute 24h") },
+                            { isMuteOption: true, hours: 0, text: qsTr("Mute Forever") }
+                        ];
                     }
-                ]
+
+                    const isMuted = Notifs.isAppMuted(root.notif.appName);
+                    const baseModel = [
+                        { isClose: true },
+                        ...(root.notif?.actions ?? []),
+                        { isCopy: true }
+                    ];
+
+                    if (root.notif.appName) {
+                        if (isMuted) {
+                            baseModel.push({ isUnmute: true });
+                        } else {
+                            baseModel.push({ isMuteToggle: true });
+                        }
+                    }
+
+                    return baseModel;
+                }
 
                 StyledRect {
                     id: action
@@ -142,6 +163,15 @@ Item {
                                 Quickshell.clipboardText = root.notif.body;
                                 actionInner.item.text = "inventory";
                                 copyTimer.start();
+                            } else if (action.modelData.isMuteToggle) {
+                                root.showMuteOptions = true;
+                            } else if (action.modelData.isUnmute) {
+                                Notifs.unmuteApp(root.notif.appName);
+                            } else if (action.modelData.isBack) {
+                                root.showMuteOptions = false;
+                            } else if (action.modelData.isMuteOption) {
+                                Notifs.muteApp(root.notif.appName, action.modelData.hours);
+                                root.showMuteOptions = false;
                             } else if (action.modelData.invoke) {
                                 action.modelData.invoke();
                             } else if (!root.notif.resident) {
@@ -154,7 +184,13 @@ Item {
                         id: actionInner
 
                         anchors.centerIn: parent
-                        sourceComponent: action.modelData.isClose || action.modelData.isCopy ? iconBtn : root.notif?.hasActionIcons ? iconComp : textComp
+                        sourceComponent: {
+                            if (action.modelData.isClose || action.modelData.isCopy || action.modelData.isMuteToggle || action.modelData.isUnmute || action.modelData.isBack)
+                                return iconBtn;
+                            if (action.modelData.isMuteOption)
+                                return textComp;
+                            return root.notif?.hasActionIcons ? iconComp : textComp;
+                        }
                     }
 
                     Component {
@@ -162,7 +198,14 @@ Item {
 
                         MaterialIcon {
                             animate: action.modelData.isCopy ?? false
-                            text: action.modelData.isCopy ? "content_copy" : "close"
+                            text: {
+                                if (action.modelData.isCopy) return "content_copy";
+                                if (action.modelData.isClose) return "close";
+                                if (action.modelData.isMuteToggle) return "notifications_paused";
+                                if (action.modelData.isUnmute) return "notifications_active";
+                                if (action.modelData.isBack) return "arrow_back";
+                                return "";
+                            }
                             color: Colours.palette.m3onSurfaceVariant
                         }
                     }

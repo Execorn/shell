@@ -257,10 +257,26 @@ Scope {
                                                 return win.screen ? win.screen.height : 1080;
                                             }
 
-                                            readonly property real scaleX: (modelData.lastIpcObject?.at?.[0] - mX) * (grid.cardWidth / mW)
-                                            readonly property real scaleY: (modelData.lastIpcObject?.at?.[1] - mY) * (grid.cardHeight / mH)
-                                            readonly property real scaleW: (modelData.lastIpcObject?.size?.[0]) * (grid.cardWidth / mW)
-                                            readonly property real scaleH: (modelData.lastIpcObject?.size?.[1]) * (grid.cardHeight / mH)
+                                            readonly property real scaleX: {
+                                                const at = modelData.lastIpcObject ? modelData.lastIpcObject.at : null;
+                                                if (!at || at.length < 2 || isNaN(at[0]) || isNaN(at[1]) || mW === 0) return 0;
+                                                return (at[0] - mX) * (grid.cardWidth / mW);
+                                            }
+                                            readonly property real scaleY: {
+                                                const at = modelData.lastIpcObject ? modelData.lastIpcObject.at : null;
+                                                if (!at || at.length < 2 || isNaN(at[0]) || isNaN(at[1]) || mH === 0) return 0;
+                                                return (at[1] - mY) * (grid.cardHeight / mH);
+                                            }
+                                            readonly property real scaleW: {
+                                                const size = modelData.lastIpcObject ? modelData.lastIpcObject.size : null;
+                                                if (!size || size.length < 2 || isNaN(size[0]) || isNaN(size[1]) || mW === 0) return 0;
+                                                return size[0] * (grid.cardWidth / mW);
+                                            }
+                                            readonly property real scaleH: {
+                                                const size = modelData.lastIpcObject ? modelData.lastIpcObject.size : null;
+                                                if (!size || size.length < 2 || isNaN(size[0]) || isNaN(size[1]) || mH === 0) return 0;
+                                                return size[1] * (grid.cardHeight / mH);
+                                            }
 
                                             x: scaleX
                                             y: scaleY

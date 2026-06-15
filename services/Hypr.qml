@@ -24,7 +24,14 @@ Singleton {
     readonly property HyprlandMonitor focusedMonitor: Hyprland.focusedMonitor
     readonly property int activeWsId: focusedWorkspace?.id ?? 1
 
-    readonly property HyprKeyboard keyboard: extras && extras.devices && extras.devices.keyboards ? extras.devices.keyboards.find(kb => kb.main) : null
+    readonly property HyprKeyboard keyboard: {
+        if (!extras || !extras.devices || !extras.devices.keyboards) return null;
+        const kbs = extras.devices.keyboards;
+        for (let i = 0; i < kbs.length; i++) {
+            if (kbs[i] && kbs[i].main) return kbs[i];
+        }
+        return null;
+    }
     readonly property bool capsLock: keyboard?.capsLock ?? false
     readonly property bool numLock: keyboard?.numLock ?? false
     readonly property string defaultKbLayout: keyboard?.layout?.split(",")[0] ?? "??"

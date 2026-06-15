@@ -39,6 +39,20 @@ QtObject {
     property bool hasActionIcons
     property list<var> actions
 
+    readonly property bool isCritical: {
+        if (urgency === NotificationUrgency.Critical)
+            return true;
+
+        const app = (appName || "").toLowerCase();
+        if (app === "system" || app === "systemd" || app === "os" || app === "kernel" || app === "configuration")
+            return true;
+
+        const sum = (summary || "").toLowerCase();
+        const b = (body || "").toLowerCase();
+        const keywords = ["error", "critical", "exception"];
+        return keywords.some(k => sum.includes(k) || b.includes(k));
+    }
+
     readonly property bool hasFullscreen: {
         const monitor = Hypr.focusedMonitor;
         const specialName = monitor?.lastIpcObject?.specialWorkspace?.name;

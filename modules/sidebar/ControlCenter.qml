@@ -12,6 +12,7 @@ import qs.components.controls
 import qs.components.effects
 import qs.services
 import qs.utils
+import "../utilities/cards"
 
 Item {
     id: root
@@ -321,6 +322,12 @@ Item {
                     onInteraction: v => ScreenTemp.temperature = Math.round(from + v * (to - from))
                 }
             }
+
+            SectionHeader {
+                title: qsTr("Power")
+            }
+
+            IdleInhibit {}
 
             SectionHeader {
                 title: qsTr("Weather")

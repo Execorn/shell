@@ -46,12 +46,18 @@ Singleton {
             }
         } else if (!loc || timer.elapsed() > 900) {
             Requests.get("https://ipinfo.io/json", text => {
-                const response = JSON.parse(text);
-                if (response.loc) {
-                    loc = response.loc;
-                    city = response.city ?? "";
-                    timer.restart();
+                try {
+                    const response = JSON.parse(text);
+                    if (response.loc) {
+                        loc = response.loc;
+                        city = response.city ?? "";
+                        timer.restart();
+                    }
+                } catch (e) {
+                    console.error("[Weather.qml ipinfo json parse error]", e);
                 }
+            }, err => {
+                console.error("[Weather.qml ipinfo network error]", err);
             });
         }
     }
@@ -67,27 +73,39 @@ Singleton {
         const fallbackToBigDataCloud = () => {
             const fallbackUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
             Requests.get(fallbackUrl, text => {
-                const geo = JSON.parse(text);
-                const geoCity = geo.city || geo.locality;
-                if (geoCity) {
-                    city = geoCity;
-                    cachedCities.set(coords, geoCity);
-                } else {
+                try {
+                    const geo = JSON.parse(text);
+                    const geoCity = geo.city || geo.locality;
+                    if (geoCity) {
+                        city = geoCity;
+                        cachedCities.set(coords, geoCity);
+                    } else {
+                        city = "Unknown City";
+                    }
+                } catch (e) {
                     city = "Unknown City";
+                    console.error("[Weather.qml bigdatacloud json parse error]", e);
                 }
+            }, err => {
+                city = "Unknown City";
+                console.error("[Weather.qml bigdatacloud network error]", err);
             });
         };
 
         const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=geocodejson`;
         Requests.get(nominatimUrl, text => {
-            const geo = JSON.parse(text).features?.[0]?.properties.geocoding;
-            if (geo) {
-                const geoCity = geo.type === "city" ? geo.name : geo.city;
-                if (geoCity) {
-                    city = geoCity;
-                    cachedCities.set(coords, geoCity);
-                    return;
+            try {
+                const geo = JSON.parse(text).features?.[0]?.properties.geocoding;
+                if (geo) {
+                    const geoCity = geo.type === "city" ? geo.name : geo.city;
+                    if (geoCity) {
+                        city = geoCity;
+                        cachedCities.set(coords, geoCity);
+                        return;
+                    }
                 }
+            } catch (e) {
+                console.error("[Weather.qml nominatim json parse error]", e);
             }
             fallbackToBigDataCloud();
         }, fallbackToBigDataCloud);
@@ -97,15 +115,25 @@ Singleton {
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=en&format=json`;
 
         Requests.get(url, text => {
-            const json = JSON.parse(text);
-            if (json.results && json.results.length > 0) {
-                const result = json.results[0];
-                loc = result.latitude + "," + result.longitude;
-                city = result.name;
-            } else {
+            try {
+                const json = JSON.parse(text);
+                if (json.results && json.results.length > 0) {
+                    const result = json.results[0];
+                    loc = result.latitude + "," + result.longitude;
+                    city = result.name;
+                } else {
+                    loc = "";
+                    reload();
+                }
+            } catch (e) {
+                console.error("[Weather.qml open-meteo geocode json parse error]", e);
                 loc = "";
                 reload();
             }
+        }, err => {
+            console.error("[Weather.qml open-meteo geocode network error]", err);
+            loc = "";
+            reload();
         });
     }
 
@@ -115,51 +143,57 @@ Singleton {
             return;
 
         Requests.get(url, text => {
-            const json = JSON.parse(text);
-            if (!json.current || !json.daily)
-                return;
+            try {
+                const json = JSON.parse(text);
+                if (!json.current || !json.daily)
+                    return;
 
-            cc = {
-                weatherCode: json.current.weather_code,
-                weatherDesc: getWeatherCondition(json.current.weather_code),
-                tempC: json.current.temperature_2m,
-                feelsLikeC: json.current.apparent_temperature,
-                humidity: json.current.relative_humidity_2m,
-                windSpeed: json.current.wind_speed_10m,
-                isDay: json.current.is_day,
-                sunrise: json.daily.sunrise[0].replace("T", " "),
-                sunset: json.daily.sunset[0].replace("T", " ")
-            };
+                cc = {
+                    weatherCode: json.current.weather_code,
+                    weatherDesc: getWeatherCondition(json.current.weather_code),
+                    tempC: json.current.temperature_2m,
+                    feelsLikeC: json.current.apparent_temperature,
+                    humidity: json.current.relative_humidity_2m,
+                    windSpeed: json.current.wind_speed_10m,
+                    isDay: json.current.is_day,
+                    sunrise: json.daily.sunrise[0].replace("T", " "),
+                    sunset: json.daily.sunset[0].replace("T", " ")
+                };
 
-            const forecastList = [];
-            for (let i = 0; i < json.daily.time.length; i++)
-                forecastList.push({
-                    date: json.daily.time[i].replace(/-/g, "/"),
-                    maxTempC: json.daily.temperature_2m_max[i],
-                    minTempC: json.daily.temperature_2m_min[i],
-                    weatherCode: json.daily.weather_code[i],
-                    icon: Icons.getWeatherIcon(json.daily.weather_code[i])
-                });
-            forecast = forecastList;
+                const forecastList = [];
+                for (let i = 0; i < json.daily.time.length; i++)
+                    forecastList.push({
+                        date: json.daily.time[i].replace(/-/g, "/"),
+                        maxTempC: json.daily.temperature_2m_max[i],
+                        minTempC: json.daily.temperature_2m_min[i],
+                        weatherCode: json.daily.weather_code[i],
+                        icon: Icons.getWeatherIcon(json.daily.weather_code[i])
+                    });
+                forecast = forecastList;
 
-            const hourlyList = [];
-            const now = new Date();
-            for (let i = 0; i < json.hourly.time.length; i++) {
-                const time = new Date(json.hourly.time[i].replace("T", " "));
+                const hourlyList = [];
+                const now = new Date();
+                for (let i = 0; i < json.hourly.time.length; i++) {
+                    const time = new Date(json.hourly.time[i].replace("T", " "));
 
-                if (time < now)
-                    continue;
+                    if (time < now)
+                        continue;
 
-                hourlyList.push({
-                    timestamp: json.hourly.time[i],
-                    hour: time.getHours(),
-                    tempC: Math.round(json.hourly.temperature_2m[i]),
-                    precipChance: json.hourly.precipitation_probability[i],
-                    weatherCode: json.hourly.weather_code[i],
-                    icon: Icons.getWeatherIcon(json.hourly.weather_code[i])
-                });
+                    hourlyList.push({
+                        timestamp: json.hourly.time[i],
+                        hour: time.getHours(),
+                        tempC: Math.round(json.hourly.temperature_2m[i]),
+                        precipChance: json.hourly.precipitation_probability[i],
+                        weatherCode: json.hourly.weather_code[i],
+                        icon: Icons.getWeatherIcon(json.hourly.weather_code[i])
+                    });
+                }
+                hourlyForecast = hourlyList;
+            } catch (e) {
+                console.error("[Weather.qml fetchWeatherData json parse error]", e);
             }
-            hourlyForecast = hourlyList;
+        }, err => {
+            console.error("[Weather.qml fetchWeatherData network error]", err);
         });
     }
 

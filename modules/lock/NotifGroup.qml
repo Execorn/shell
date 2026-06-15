@@ -27,7 +27,7 @@ StyledRect {
                 img = n.image;
             if (!icon && n.appIcon.length > 0)
                 icon = n.appIcon;
-            if (n.urgency === NotificationUrgency.Critical)
+            if (n.isCritical)
                 hasCritical = true;
             else if (n.urgency === NotificationUrgency.Normal)
                 hasNormal = true;
@@ -50,7 +50,7 @@ StyledRect {
 
     clip: true
     radius: Tokens.rounding.large
-    color: root.urgency === "critical" ? Colours.palette.m3secondaryContainer : Colours.layer(Colours.palette.m3surfaceContainerHigh, 2)
+    color: root.urgency === "critical" ? Colours.palette.m3errorContainer : Colours.layer(Colours.palette.m3surfaceContainerHigh, 2)
 
     RowLayout {
         id: content

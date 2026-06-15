@@ -32,7 +32,7 @@ Item {
         anchors.right: parent.right
         anchors.margins: Tokens.padding.extraSmall
 
-        implicitHeight: Math.max(count.implicitHeight, titleText.implicitHeight)
+        implicitHeight: Math.max(count.implicitHeight, titleText.implicitHeight, clearBtn.implicitHeight)
 
         StyledText {
             id: count
@@ -62,13 +62,32 @@ Item {
 
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: count.right
-            anchors.right: parent.right
+            anchors.right: clearBtn.left
             anchors.leftMargin: Tokens.spacing.extraSmall
+            anchors.rightMargin: Tokens.spacing.small
 
             text: root.notifCount > 0 ? qsTr("notification%1").arg(root.notifCount === 1 ? "" : "s") : qsTr("Notifications")
             color: Colours.palette.m3outline
             font: Tokens.font.label.large
             elide: Text.ElideRight
+        }
+
+        IconButton {
+            id: clearBtn
+
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            icon: "clear_all"
+            opacity: root.notifCount > 0 ? 1 : 0
+            enabled: root.notifCount > 0
+
+            Behavior on opacity {
+                Anim {
+                    type: Anim.DefaultEffects
+                }
+            }
+
+            onClicked: clearTimer.start()
         }
     }
 
@@ -170,41 +189,5 @@ Item {
         }
     }
 
-    Loader {
-        asynchronous: true
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: Tokens.padding.medium
 
-        scale: root.notifCount > 0 ? 1 : 0.5
-        opacity: root.notifCount > 0 ? 1 : 0
-        active: opacity > 0
-
-        sourceComponent: IconButton {
-            id: clearBtn
-
-            icon: "clear_all"
-            font: Tokens.font.icon.large
-            onClicked: clearTimer.start()
-
-            Elevation {
-                anchors.fill: parent
-                radius: parent.radius
-                z: -1
-                level: clearBtn.stateLayer.containsMouse ? 4 : 3
-            }
-        }
-
-        Behavior on scale {
-            Anim {
-                type: Anim.FastSpatial
-            }
-        }
-
-        Behavior on opacity {
-            Anim {
-                type: Anim.DefaultEffects
-            }
-        }
-    }
 }

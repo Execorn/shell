@@ -6,6 +6,7 @@ import Quickshell.Io
 import Caelestia
 import qs.utils
 import qs.components.misc
+import qs.services
 
 Singleton {
     id: root
@@ -14,9 +15,19 @@ Singleton {
     property string translatedText: ""
     property bool running: false
     property string lastError: ""
+    property string activeDrawer: ""
+
+    readonly property string user: Quickshell.env("USER") || "default"
+    readonly property string tempPath: "/tmp/ocr_capture_" + (Quickshell.env("USER") || "user") + "_" + Math.floor(Math.random() * 10000) + ".png"
+
+    readonly property Timer startTimer: Timer {
+        interval: 250
+        repeat: false
+        onTriggered: root.startProcess()
+    }
 
     readonly property Process ocrProcess: Process {
-        command: ["sh", "-c", "geom=$(slurp) && grim -g \"$geom\" /tmp/ocr_capture.png && tesseract /tmp/ocr_capture.png stdout -l eng 2>/dev/null | wl-copy && wl-paste"]
+        command: ["sh", "-c", "geom=$(slurp) && grim -g \"$geom\" " + tempPath + " && tesseract " + tempPath + " stdout -l eng 2>/dev/null | wl-copy && wl-paste"]
         stdout: StdioCollector {
             onStreamFinished: {
                 root.running = false;
@@ -27,8 +38,21 @@ Singleton {
                 } else {
                     root.lastError = "No text detected, or operation cancelled.";
                 }
+
+                if (root.activeDrawer !== "") {
+                    const vis = Visibilities.getForActive();
+                    if (vis) {
+                        vis[root.activeDrawer] = true;
+                    }
+                    root.activeDrawer = "";
+                }
             }
         }
+    }
+
+    function startProcess(): void {
+        ocrProcess.running = false;
+        ocrProcess.running = true;
     }
 
     function startOcr(): void {
@@ -36,9 +60,33 @@ Singleton {
         translatedText = "";
         lastError = "";
         running = true;
+        activeDrawer = "";
 
-        ocrProcess.running = false;
-        ocrProcess.running = true;
+        const vis = Visibilities.getForActive();
+        if (vis) {
+            if (vis.sidebar) {
+                activeDrawer = "sidebar";
+                vis.sidebar = false;
+            } else if (vis.launcher) {
+                activeDrawer = "launcher";
+                vis.launcher = false;
+            } else if (vis.dashboard) {
+                activeDrawer = "dashboard";
+                vis.dashboard = false;
+            } else if (vis.session) {
+                activeDrawer = "session";
+                vis.session = false;
+            } else if (vis.cheatsheet) {
+                activeDrawer = "cheatsheet";
+                vis.cheatsheet = false;
+            }
+        }
+
+        if (activeDrawer !== "") {
+            startTimer.restart();
+        } else {
+            startProcess();
+        }
     }
 
     function translateText(targetLang: string): void {
@@ -50,6 +98,17 @@ Singleton {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "http://localhost:11434/api/chat", true);
         xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 10000;
+        xhr.ontimeout = function() {
+            root.translatedText = "";
+            root.lastError = "Ollama connection error. (Request timed out)";
+            console.error("[Ocr.qml translation timeout]");
+        };
+        xhr.onerror = function() {
+            root.translatedText = "";
+            root.lastError = "Ollama connection error. (Request failed)";
+            console.error("[Ocr.qml translation error]");
+        };
 
         const payload = {
             "model": "llama3:latest",
@@ -77,8 +136,10 @@ Singleton {
                         root.lastError = "Translation failed.";
                     }
                 } else {
-                    root.translatedText = "";
-                    root.lastError = "Ollama connection error.";
+                    if (!root.lastError) {
+                        root.translatedText = "";
+                        root.lastError = "Ollama connection error.";
+                    }
                 }
             }
         };
@@ -95,6 +156,17 @@ Singleton {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "http://localhost:11434/api/chat", true);
         xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 10000;
+        xhr.ontimeout = function() {
+            root.translatedText = "";
+            root.lastError = "Ollama connection error. (Request timed out)";
+            console.error("[Ocr.qml explanation timeout]");
+        };
+        xhr.onerror = function() {
+            root.translatedText = "";
+            root.lastError = "Ollama connection error. (Request failed)";
+            console.error("[Ocr.qml explanation error]");
+        };
 
         const payload = {
             "model": "llama3:latest",
@@ -122,8 +194,10 @@ Singleton {
                         root.lastError = "Explanation failed.";
                     }
                 } else {
-                    root.translatedText = "";
-                    root.lastError = "Ollama connection error.";
+                    if (!root.lastError) {
+                        root.translatedText = "";
+                        root.lastError = "Ollama connection error.";
+                    }
                 }
             }
         };

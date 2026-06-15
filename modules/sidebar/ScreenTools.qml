@@ -9,9 +9,13 @@ import qs.components.containers
 import qs.components.controls
 import qs.services
 import qs.utils
+import "../utilities/cards"
 
 Item {
     id: root
+
+    required property var props
+    required property DrawerVisibilities visibilities
 
     anchors.fill: parent
     anchors.margins: Tokens.padding.medium
@@ -43,6 +47,15 @@ Item {
                     color: Colours.palette.m3onSurface
                     font: Tokens.font.title.builders.medium.weight(Font.Bold).build()
                 }
+            }
+
+            SectionHeader {
+                title: qsTr("Screen Recording")
+            }
+
+            Record {
+                props: root.props
+                visibilities: root.visibilities
             }
 
             SectionHeader {

@@ -35,6 +35,15 @@ Singleton {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", root.ollamaEndpoint, true);
         xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 10000;
+        xhr.ontimeout = function() {
+            lastError = "Connection to Ollama timed out.";
+            console.error("[Copilot.qml Ollama timeout]");
+        };
+        xhr.onerror = function() {
+            lastError = "Connection to Ollama failed.";
+            console.error("[Copilot.qml Ollama connection error]");
+        };
 
         const systemPrompt = "You are Caelestia AI Copilot, a helpful Linux/Arch desktop assistant. You can control the user's desktop shell by outputting raw JSON command blocks anywhere in your response (e.g. at the end). Make sure to wrap it in markdown json block:\n```json\n{\n  \"action\": \"<action_name>\",\n  ...\n}\n```\nAvailable Actions:\n1. Switch active workspace: {\"action\": \"workspace\", \"id\": 1-10}\n2. Set volume percentage: {\"action\": \"volume\", \"value\": 0-100}\n3. Toggle mute (audio or mic): {\"action\": \"mute\", \"type\": \"audio\"|\"mic\", \"state\": true|false}\n4. Launch application: {\"action\": \"exec\", \"command\": \"<command_name>\"} (e.g. alacritty, librewolf, nemo)\n5. Cycle wallpaper: {\"action\": \"wallpaper\", \"direction\": \"next\"|\"prev\"|\"random\"}\n6. Toggle shell panel drawer: {\"action\": \"drawer\", \"name\": \"launcher\"|\"dashboard\"|\"cheatsheet\"|\"sidebar\", \"state\": true|false}\n7. Toggle Do Not Disturb (DND) state: {\"action\": \"dnd\", \"state\": true|false}\n\nRules:\n- Be concise, helpful, and friendly.\n- Respond in standard markdown.\n- Under no circumstances run dangerous or destructive terminal commands.\n- You can combine multiple actions by outputting multiple JSON blocks or a list of actions.";
 
@@ -93,6 +102,11 @@ Singleton {
         const url = root.geminiEndpoint + "?key=" + apiKey;
         xhr.open("POST", url, true);
         xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 10000;
+        xhr.ontimeout = function() {
+            console.warn("[Copilot.qml] Gemini API request timed out. Falling back to Ollama.");
+            triggerFallback();
+        };
 
         const systemPrompt = "You are Caelestia AI Copilot, a helpful Linux/Arch desktop assistant. You can control the user's desktop shell by outputting raw JSON command blocks anywhere in your response (e.g. at the end). Make sure to wrap it in markdown json block:\n```json\n{\n  \"action\": \"<action_name>\",\n  ...\n}\n```\nAvailable Actions:\n1. Switch active workspace: {\"action\": \"workspace\", \"id\": 1-10}\n2. Set volume percentage: {\"action\": \"volume\", \"value\": 0-100}\n3. Toggle mute (audio or mic): {\"action\": \"mute\", \"type\": \"audio\"|\"mic\", \"state\": true|false}\n4. Launch application: {\"action\": \"exec\", \"command\": \"<command_name>\"} (e.g. alacritty, librewolf, nemo)\n5. Cycle wallpaper: {\"action\": \"wallpaper\", \"direction\": \"next\"|\"prev\"|\"random\"}\n6. Toggle shell panel drawer: {\"action\": \"drawer\", \"name\": \"launcher\"|\"dashboard\"|\"cheatsheet\"|\"sidebar\", \"state\": true|false}\n7. Toggle Do Not Disturb (DND) state: {\"action\": \"dnd\", \"state\": true|false}\n\nRules:\n- Be concise, helpful, and friendly.\n- Respond in standard markdown.\n- Under no circumstances run dangerous or destructive terminal commands.\n- You can combine multiple actions by outputting multiple JSON blocks or a list of actions.";
 
@@ -114,12 +128,12 @@ Singleton {
         };
 
         let fallbackTriggered = false;
-        const triggerFallback = () => {
+        function triggerFallback() {
             if (fallbackTriggered) return;
             fallbackTriggered = true;
             console.log("[Copilot.qml] Falling back to Ollama...");
             sendToOllama();
-        };
+        }
 
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {

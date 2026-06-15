@@ -42,7 +42,7 @@ Searcher {
 
     function setWallpaper(path: string): void {
         actualCurrent = path;
-        Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", path]);
+        Quickshell.execDetached([Quickshell.shellPath("scripts/apply-theme.py"), "--wallpaper", path]);
     }
 
     function preview(path: string): void {
@@ -98,7 +98,7 @@ Searcher {
             let wall = text().trim();
             if (!wall) {
                 wall = root.fallback;
-                Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", root.fallback]);
+                Quickshell.execDetached([Quickshell.shellPath("scripts/apply-theme.py"), "--wallpaper", root.fallback]);
             }
             root.actualCurrent = wall;
             root.previewColourLock = false;
@@ -106,7 +106,7 @@ Searcher {
         onLoadFailed: {
             root.actualCurrent = root.fallback;
             root.previewColourLock = false;
-            Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", root.fallback]);
+            Quickshell.execDetached([Quickshell.shellPath("scripts/apply-theme.py"), "--wallpaper", root.fallback]);
         }
     }
 

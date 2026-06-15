@@ -9,6 +9,7 @@ Item {
     id: root
 
     required property DrawerVisibilities visibilities
+    required property var utilitiesProps
     readonly property Props props: Props {}
 
     readonly property bool shouldBeActive: visibilities.sidebar && Config.sidebar.enabled
@@ -39,6 +40,7 @@ Item {
             implicitWidth: Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins
             props: root.props
             visibilities: root.visibilities
+            utilitiesProps: root.utilitiesProps
         }
     }
 }

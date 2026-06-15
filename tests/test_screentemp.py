@@ -96,8 +96,17 @@ def test_content_tabbed_compiles_and_loads(qml_engine):
 def test_screentools_panel_compiles_and_loads(qml_engine):
     # Try loading ScreenTools.qml directly
     comp = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/ScreenTools.qml")
-    screen_tools = comp.create()
-    if not screen_tools:
+    
+    props = QObject()
+    visibilities = QObject()
+    
+    ctx = qml_engine.rootContext()
+    screen_tools = comp.beginCreate(ctx)
+    if screen_tools:
+        screen_tools.setProperty("props", props)
+        screen_tools.setProperty("visibilities", visibilities)
+        comp.completeCreate()
+    else:
         pytest.fail(f"ScreenTools.qml failed to compile: {comp.errors()}")
     assert screen_tools is not None
 

@@ -149,6 +149,7 @@ Item {
         id: sidebar
 
         visibilities: root.visibilities
+        utilitiesProps: utilities.props
 
         anchors.top: notifications.bottom
         anchors.bottom: utilities.top

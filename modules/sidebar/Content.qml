@@ -6,10 +6,11 @@ import qs.components.controls
 import qs.services
 
 Item {
-    id: root
+    id: rootRange
 
     required property Props props
     required property DrawerVisibilities visibilities
+    required property var utilitiesProps
 
     property string activeTab: "notifications" // "notifications", "control_center", or "screen_tools"
 
@@ -22,7 +23,7 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: root.activeTab === "control_center" ? parent.height : parent.height * 0.65
+            Layout.preferredHeight: rootRange.activeTab === "notifications" ? parent.height * 0.65 : parent.height
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
@@ -43,22 +44,22 @@ Item {
                     TextButton {
                         Layout.fillWidth: true
                         text: qsTr("Notifications")
-                        type: root.activeTab === "notifications" ? ButtonBase.Filled : ButtonBase.Tonal
-                        onClicked: root.activeTab = "notifications"
+                        type: rootRange.activeTab === "notifications" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: rootRange.activeTab = "notifications"
                     }
 
                     TextButton {
                         Layout.fillWidth: true
                         text: qsTr("Control Center")
-                        type: root.activeTab === "control_center" ? ButtonBase.Filled : ButtonBase.Tonal
-                        onClicked: root.activeTab = "control_center"
+                        type: rootRange.activeTab === "control_center" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: rootRange.activeTab = "control_center"
                     }
 
                     TextButton {
                         Layout.fillWidth: true
                         text: qsTr("Screen Tools")
-                        type: root.activeTab === "screen_tools" ? ButtonBase.Filled : ButtonBase.Tonal
-                        onClicked: root.activeTab = "screen_tools"
+                        type: rootRange.activeTab === "screen_tools" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: rootRange.activeTab = "screen_tools"
                     }
                 }
 
@@ -72,9 +73,9 @@ Item {
 
                         anchors.fill: parent
                         sourceComponent: {
-                            if (root.activeTab === "notifications") return notifDockComponent;
-                            if (root.activeTab === "control_center") return controlCenterComponent;
-                            if (root.activeTab === "screen_tools") return screenToolsComponent;
+                            if (rootRange.activeTab === "notifications") return notifDockComponent;
+                            if (rootRange.activeTab === "control_center") return controlCenterComponent;
+                            if (rootRange.activeTab === "screen_tools") return screenToolsComponent;
                             return null;
                         }
                     }
@@ -85,8 +86,8 @@ Item {
                 id: notifDockComponent
 
                 NotifDock {
-                    props: root.props
-                    visibilities: root.visibilities
+                    props: rootRange.props
+                    visibilities: rootRange.visibilities
                 }
             }
 
@@ -99,7 +100,10 @@ Item {
             Component {
                 id: screenToolsComponent
 
-                ScreenTools {}
+                ScreenTools {
+                    props: rootRange.utilitiesProps
+                    visibilities: rootRange.visibilities
+                }
             }
         }
 
@@ -107,7 +111,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.preferredHeight: parent.height * 0.35
-            visible: root.activeTab !== "control_center"
+            visible: rootRange.activeTab === "notifications"
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow

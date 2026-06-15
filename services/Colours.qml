@@ -38,7 +38,7 @@ Singleton {
         const luminance = getLuminance(c);
 
         const offset = (!light || layer == 1 ? 1 : -layer / 2) * (light ? 0.2 : 0.3) * (1 - transparency.base) * (1 + wallLuminance * (light ? (layer == 1 ? 3 : 1) : 2.5));
-        const scale = (luminance + offset) / luminance;
+        const scale = luminance === 0 ? 0 : (luminance + offset) / luminance;
         const r = Math.max(0, Math.min(1, c.r * scale));
         const g = Math.max(0, Math.min(1, c.g * scale));
         const b = Math.max(0, Math.min(1, c.b * scale));

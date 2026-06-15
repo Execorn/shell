@@ -76,8 +76,61 @@ Singleton {
         id: props
 
         property bool dnd
+        property string mutedAppsJson: "{}"
 
         reloadableId: "notifs"
+    }
+
+    readonly property string mutedAppsJson: props.mutedAppsJson
+
+    function getMutedApps(): var {
+        try {
+            return JSON.parse(props.mutedAppsJson || "{}");
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function saveMutedApps(muted: var): void {
+        props.mutedAppsJson = JSON.stringify(muted);
+    }
+
+    function isAppMuted(appName: string): bool {
+        if (!appName)
+            return false;
+        const muted = getMutedApps();
+        const exp = muted[appName];
+        if (exp === undefined)
+            return false;
+        if (exp === 0)
+            return true;
+        if (Date.now() < exp) {
+            return true;
+        } else {
+            delete muted[appName];
+            saveMutedApps(muted);
+            return false;
+        }
+    }
+
+    function muteApp(appName: string, hours: real): void {
+        if (!appName)
+            return;
+        const muted = getMutedApps();
+        if (hours === 0) {
+            muted[appName] = 0;
+        } else {
+            muted[appName] = Date.now() + Math.round(hours * 3600 * 1000);
+        }
+        saveMutedApps(muted);
+    }
+
+    function unmuteApp(appName: string): void {
+        if (!appName)
+            return;
+        const muted = getMutedApps();
+        delete muted[appName];
+        saveMutedApps(muted);
     }
 
     NotificationServer {
@@ -95,7 +148,7 @@ Singleton {
             notif.tracked = true;
 
             const comp = notifComp.createObject(root, {
-                popup: root.shouldShowPopup(),
+                popup: root.shouldShowPopup() && !root.isAppMuted(notif.appName),
                 notification: notif
             });
             root.list = [comp, ...root.list];

@@ -189,6 +189,8 @@ class MockFileSystemModel(QObject):
         self._recursive = False
         self._filter = 0
         self._entries = []
+        self._nameFilters = []
+        self._sortReverse = False
 
     @Property(str)
     def path(self): return self._path
@@ -204,6 +206,16 @@ class MockFileSystemModel(QObject):
     def filter(self): return self._filter
     @filter.setter
     def filter(self, val): self._filter = val
+
+    @Property('QStringList')
+    def nameFilters(self): return self._nameFilters
+    @nameFilters.setter
+    def nameFilters(self, val): self._nameFilters = val
+
+    @Property(bool)
+    def sortReverse(self): return self._sortReverse
+    @sortReverse.setter
+    def sortReverse(self, val): self._sortReverse = val
 
     @Property('QVariantList', notify=entriesChanged)
     def entries(self): return self._entries
@@ -805,7 +817,7 @@ def mock_bins():
     for log in ["wpctl_calls.log", "grim_calls.log", "hyprctl_calls.log", "caelestia_calls.log", "wlsunset_calls.log", "pkill_calls.log", "nmcli_calls.log", "bluetoothctl_calls.log"]:
         log_path = pathlib.Path("/tmp") / log
         if log_path.exists():
-            log_path.unlink()
+            log_path.unlink(missing_ok=True)
             
     # Mock slurp
     slurp = bin_dir / "slurp"
@@ -814,7 +826,7 @@ def mock_bins():
     
     # Mock grim
     grim = bin_dir / "grim"
-    grim.write_text("#!/bin/bash\ntouch /tmp/ocr_capture.png\necho \"grim $@\" >> /tmp/grim_calls.log\nexit 0\n")
+    grim.write_text("#!/bin/bash\ntouch \"${@: -1}\"\necho \"grim $@\" >> /tmp/grim_calls.log\nexit 0\n")
     grim.chmod(0o755)
     
     # Mock tesseract
@@ -1008,6 +1020,7 @@ def ricing_suite(qml_engine, mock_bins):
         "requests": requests_mock,
         "cutils": cutils_mock,
         "quickshell": quickshell_mock,
+        "xhr_fn": xhr_fn, # Prevent garbage collection!
         "hyprland": hyprland_mock,
         "colours": colours
     }
