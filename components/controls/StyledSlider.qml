@@ -17,7 +17,7 @@ Slider {
     property int waveDuration: 1000
     property int radius: Tokens.rounding.medium
     property bool interactionOnMove: true
-    readonly property bool dragging: mouse.pressed
+    readonly property bool dragging: pressed
 
     property color fgColour: enabled ? Colours.palette.m3primary : Qt.alpha(Colours.palette.m3onSurface, 0.38)
     property color bgColour: enabled ? Colours.palette.m3secondaryContainer : Qt.alpha(Colours.palette.m3onSurface, 0.1)
@@ -28,6 +28,12 @@ Slider {
     signal interaction(v: real)
 
     Component.onCompleted: filledWidth = Qt.binding(() => (width - handle.implicitWidth - handle.anchors.leftMargin) * pos)
+
+    onMoved: {
+        if (interactionOnMove) {
+            interaction(value);
+        }
+    }
 
     implicitWidth: 200
     implicitHeight: 12
@@ -76,7 +82,7 @@ Slider {
             implicitHeight: {
                 const t = CUtils.clamp((parent.height - 12) / 16, 0, 1);
                 const lerp = (a, b) => a + (b - a) * t;
-                return parent.height * (mouse.pressed ? lerp(3.5, 1.5) : lerp(3, 1.2));
+                return parent.height * (pressed ? lerp(3.5, 1.5) : lerp(3, 1.2));
             }
 
             radius: Tokens.rounding.full
@@ -140,42 +146,6 @@ Slider {
                     CAnim {}
                 }
             }
-        }
-    }
-
-    Binding {
-        id: posBinding
-
-        target: root
-        property: "pos"
-        value: CUtils.clamp(mouse.pressStartPos + mouse.dragMovement, 0, 1)
-        when: mouse.pressed
-    }
-
-    MouseArea {
-        id: mouse
-
-        property real pressStartX
-        property real pressStartPos
-        property real dragMovement
-
-        anchors.fill: parent
-        preventStealing: true
-
-        onPressed: e => {
-            widthBehavior.enabled = false;
-            pressStartX = e.x;
-            pressStartPos = root.visualPosition;
-        }
-        onPositionChanged: e => {
-            dragMovement = (e.x - pressStartX) / width;
-            if (root.interactionOnMove)
-                root.interaction(posBinding.value);
-        }
-        onReleased: e => {
-            root.interaction(posBinding.value);
-            widthBehavior.enabled = true;
-            dragMovement = 0;
         }
     }
 
