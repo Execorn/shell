@@ -6,6 +6,7 @@
 #include <qimage.h>
 #include <qloggingcategory.h>
 #include <qquickwindow.h>
+#include <array>
 
 Q_LOGGING_CATEGORY(lcImageAnalyser, "caelestia.imageanalyser", QtInfoMsg)
 
@@ -182,7 +183,7 @@ void ImageAnalyser::analyse(QPromise<AnalyseResult>& promise, const QImage& imag
     const int height = img.height();
     const qsizetype bytesPerLine = img.bytesPerLine();
 
-    std::unordered_map<quint32, int> colours;
+    std::array<int, 32768> colours = {0};
     qreal totalLuminance = 0.0;
     int count = 0;
 
@@ -199,10 +200,11 @@ void ImageAnalyser::analyse(QPromise<AnalyseResult>& promise, const QImage& imag
                 continue;
             }
 
-            const quint32 mr = static_cast<quint32>(pixel[2] & 0xF8);
-            const quint32 mg = static_cast<quint32>(pixel[1] & 0xF8);
-            const quint32 mb = static_cast<quint32>(pixel[0] & 0xF8);
-            ++colours[(mr << 16) | (mg << 8) | mb];
+            const quint32 r_5bit = pixel[2] >> 3;
+            const quint32 g_5bit = pixel[1] >> 3;
+            const quint32 b_5bit = pixel[0] >> 3;
+            const quint32 index = (r_5bit << 10) | (g_5bit << 5) | b_5bit;
+            ++colours[index];
 
             const qreal r = pixel[2] / 255.0;
             const qreal g = pixel[1] / 255.0;
@@ -214,13 +216,16 @@ void ImageAnalyser::analyse(QPromise<AnalyseResult>& promise, const QImage& imag
 
     quint32 dominantColour = 0;
     int maxCount = 0;
-    for (const auto& [colour, colourCount] : colours) {
+    for (std::size_t index = 0; index < colours.size(); ++index) {
         if (promise.isCanceled()) {
             return;
         }
 
+        const int colourCount = colours[index];
         if (colourCount > maxCount) {
-            dominantColour = colour;
+            const quint32 idx = static_cast<quint32>(index);
+            const quint32 color = ((idx >> 10) << 3) << 16 | (((idx >> 5) & 0x1F) << 3) << 8 | ((idx & 0x1F) << 3);
+            dominantColour = color;
             maxCount = colourCount;
         }
     }

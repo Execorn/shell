@@ -104,6 +104,8 @@ private:
     QList<QRegularExpression> m_favouriteAppsRegex; // pre-regexified m_favouriteApps list
     QHash<QString, AppEntry*> m_apps;
     mutable QList<AppEntry*> m_sortedApps;
+    mutable bool m_sortedAppsDirty = true;
+    mutable QHash<QString, bool> m_favouriteCache;
 
     QString regexifyString(const QString& original) const;
     QList<AppEntry*>& getSortedApps() const;
