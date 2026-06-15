@@ -42,15 +42,18 @@ Singleton {
     function setVolume(newVolume: real): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
-        if (isVirtual && root.physicalDriverId !== -1) {
-            const driverId = root.physicalDriverId;
+        const targetId = (isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (isNodeValid(sink) ? sink.id : -1);
+
+        if (targetId !== -1) {
             const volClamped = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
             volumeSetProc.running = false;
-            volumeSetProc.command = ["wpctl", "set-volume", driverId.toString(), volClamped.toFixed(2)];
+            volumeSetProc.command = ["wpctl", "set-volume", targetId.toString(), volClamped.toFixed(2)];
             volumeSetProc.running = true;
             root.customVolume = volClamped;
             root.customMuted = 0;
-        } else if (isNodeValid(sink) && sink.audio) {
+        }
+
+        if (!isVirtual && isNodeValid(sink) && sink.audio) {
             sink.audio.muted = false;
             sink.audio.volume = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
         }
@@ -200,13 +203,17 @@ Singleton {
     function setStreamMuted(stream: var, muted: bool): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
-        if (stream === root.sink && isVirtual && root.physicalDriverId !== -1) {
-            const driverId = root.physicalDriverId;
+        const targetId = (stream === root.sink && isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (stream === root.sink && isNodeValid(root.sink) ? root.sink.id : -1);
+
+        if (targetId !== -1) {
             muteSetProc.running = false;
-            muteSetProc.command = ["wpctl", "set-mute", driverId.toString(), muted ? "1" : "0"];
+            muteSetProc.command = ["wpctl", "set-mute", targetId.toString(), muted ? "1" : "0"];
             muteSetProc.running = true;
             root.customMuted = muted ? 1 : 0;
-        } else if (isNodeValid(stream) && stream.audio) {
+        }
+
+        const isDefaultSink = stream === root.sink;
+        if ((!isDefaultSink || !isVirtual) && isNodeValid(stream) && stream.audio) {
             stream.audio.muted = muted;
         }
     }

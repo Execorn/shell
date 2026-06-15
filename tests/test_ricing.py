@@ -119,11 +119,17 @@ class OverrideMockProcess(QObject):
                         if self._stdout:
                             self._stdout.setProperty("text", res.stdout)
                             if hasattr(self._stdout, "streamFinished"):
-                                self._stdout.streamFinished.emit()
+                                try:
+                                    self._stdout.streamFinished.emit()
+                                except RuntimeError:
+                                    pass
                     except Exception as e:
                         print("OverrideMockProcess error:", e)
                     self._running = False
-                    self.runningChanged.emit(False)
+                    try:
+                        self.runningChanged.emit(False)
+                    except RuntimeError:
+                        pass
                 QTimer.singleShot(0, run_proc)
 
     def get_command(self): return self._command

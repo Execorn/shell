@@ -22,7 +22,7 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.65
+            Layout.preferredHeight: root.activeTab === "control_center" ? parent.height : parent.height * 0.65
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
@@ -107,6 +107,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.preferredHeight: parent.height * 0.35
+            visible: root.activeTab !== "control_center"
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow

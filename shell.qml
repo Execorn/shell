@@ -16,6 +16,14 @@ import QtQuick
 import qs.services
 
 ShellRoot {
+    id: rootRoot
+
+    property var pluginManager: PluginManager
+    property var hypr: Hypr
+    property var ocr: Ocr
+    property var players: Players
+    property var notifs: Notifs
+
     settings.watchFiles: false
 
     GSFLoader {}
@@ -36,12 +44,5 @@ ShellRoot {
         lock: lock
     }
 
-    Component.onCompleted: {
-        let _ = PluginManager;
-        let _2 = Hypr;
-        let _3 = Ocr;
-        let _4 = Players;
-        let _5 = Notifs;
-    }
 }
 
