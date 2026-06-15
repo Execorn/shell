@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
+import qs.components.controls
 import qs.services
 
 Item {
@@ -9,6 +10,8 @@ Item {
 
     required property Props props
     required property DrawerVisibilities visibilities
+
+    property string activeTab: "notifications" // "notifications", "control_center", or "screen_tools"
 
     ColumnLayout {
         id: layout
@@ -19,22 +22,98 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.preferredHeight: parent.height * 0.55
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
 
-            NotifDock {
-                props: root.props
-                visibilities: root.visibilities
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                // Tab Bar
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Tokens.padding.medium
+                    Layout.leftMargin: Tokens.padding.medium
+                    Layout.rightMargin: Tokens.padding.medium
+                    spacing: Tokens.spacing.small
+
+                    TextButton {
+                        Layout.fillWidth: true
+                        text: qsTr("Notifications")
+                        type: root.activeTab === "notifications" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: root.activeTab = "notifications"
+                    }
+
+                    TextButton {
+                        Layout.fillWidth: true
+                        text: qsTr("Control Center")
+                        type: root.activeTab === "control_center" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: root.activeTab = "control_center"
+                    }
+
+                    TextButton {
+                        Layout.fillWidth: true
+                        text: qsTr("Screen Tools")
+                        type: root.activeTab === "screen_tools" ? ButtonBase.Filled : ButtonBase.Tonal
+                        onClicked: root.activeTab = "screen_tools"
+                    }
+                }
+
+                // Tab Content Area
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    Loader {
+                        id: contentLoader
+
+                        anchors.fill: parent
+                        sourceComponent: {
+                            if (root.activeTab === "notifications") return notifDockComponent;
+                            if (root.activeTab === "control_center") return controlCenterComponent;
+                            if (root.activeTab === "screen_tools") return screenToolsComponent;
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            Component {
+                id: notifDockComponent
+
+                NotifDock {
+                    props: root.props
+                    visibilities: root.visibilities
+                }
+            }
+
+            Component {
+                id: controlCenterComponent
+
+                ControlCenter {}
+            }
+
+            Component {
+                id: screenToolsComponent
+
+                ScreenTools {}
             }
         }
 
         StyledRect {
-            Layout.topMargin: Tokens.padding.large - layout.spacing
             Layout.fillWidth: true
-            implicitHeight: 1
+            Layout.fillHeight: true
+            Layout.preferredHeight: parent.height * 0.45
 
-            color: Colours.tPalette.m3outlineVariant
+            radius: Tokens.rounding.large
+            color: Colours.tPalette.m3surfaceContainerLow
+
+            CopilotChat {
+                anchors.fill: parent
+            }
         }
     }
 }
+

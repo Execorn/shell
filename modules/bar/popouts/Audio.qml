@@ -98,6 +98,56 @@ Item {
             }
         }
 
+        StyledText {
+            Layout.topMargin: Tokens.spacing.medium
+            text: qsTr("Applications")
+            font: Tokens.font.body.builders.medium.weight(Font.Medium).build()
+            visible: Audio.streams.length > 0
+        }
+
+        Repeater {
+            model: Audio.streams
+            visible: Audio.streams.length > 0
+
+            ColumnLayout {
+                required property var modelData
+
+                Layout.fillWidth: true
+                spacing: Tokens.spacing.small
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Tokens.spacing.medium
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: Audio.getStreamName(modelData)
+                        font: Tokens.font.body.builders.small.build()
+                        elide: Text.ElideRight
+                    }
+
+                    IconButton {
+                        icon: Audio.getStreamMuted(modelData) ? "volume_off" : "volume_up"
+                        onClicked: Audio.setStreamMuted(modelData, !Audio.getStreamMuted(modelData))
+                    }
+                }
+
+                CustomMouseArea {
+                    Layout.fillWidth: true
+                    implicitHeight: Tokens.padding.medium * 3
+
+                    StyledSlider {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        implicitHeight: parent.implicitHeight
+
+                        value: Audio.getStreamVolume(modelData)
+                        onInteraction: value => Audio.setStreamVolume(modelData, value)
+                    }
+                }
+            }
+        }
+
         IconTextButton {
             Layout.fillWidth: true
             Layout.topMargin: Tokens.spacing.medium

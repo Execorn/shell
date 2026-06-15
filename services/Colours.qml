@@ -61,20 +61,27 @@ Singleton {
 
     function load(data: string, isPreview: bool): void {
         const colours = isPreview ? preview : current;
-        const scheme = JSON.parse(data);
+        try {
+            const scheme = JSON.parse(data);
+            if (!scheme) return;
 
-        if (!isPreview) {
-            root.scheme = scheme.name;
-            flavour = scheme.flavour;
-            currentLight = scheme.mode === "light";
-        } else {
-            previewLight = scheme.mode === "light";
-        }
+            if (!isPreview) {
+                root.scheme = scheme.name;
+                flavour = scheme.flavour;
+                currentLight = scheme.mode === "light";
+            } else {
+                previewLight = scheme.mode === "light";
+            }
 
-        for (const [name, colour] of Object.entries(scheme.colours)) {
-            const propName = name.startsWith("term") ? name : `m3${name}`;
-            if (colours.hasOwnProperty(propName))
-                colours[propName] = `#${colour}`;
+            if (scheme.colours) {
+                for (const [name, colour] of Object.entries(scheme.colours)) {
+                    const propName = name.startsWith("term") ? name : `m3${name}`;
+                    if (colours.hasOwnProperty(propName))
+                        colours[propName] = `#${colour}`;
+                }
+            }
+        } catch (e) {
+            console.warn("[Colours.qml] Failed to parse scheme JSON:", e);
         }
     }
 

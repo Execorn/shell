@@ -1539,3 +1539,88 @@ def test_t2_ui_popout_resizing_stress(audio_suite):
 
 def test_t2_ui_popout_detach_fail(audio_suite):
     pass
+
+def test_ui_application_stream_volume_and_mute(qapp, qml_engine, mock_pipewire, mock_toaster):
+    # Reset mocks
+    mock_pipewire.clear_nodes()
+    mock_pipewire.set_defaultAudioSink(None)
+    mock_pipewire.set_defaultAudioSource(None)
+    mock_pipewire.set_preferredDefaultAudioSink(None)
+    mock_pipewire.set_preferredDefaultAudioSource(None)
+    mock_toaster.toasts.clear()
+    
+    # 1. Add application stream node BEFORE loading singleton or UI
+    n_stream = MockPwNode(8, "spotify_stream", "Spotify", is_sink=False, is_stream=True, ready=True, volume=0.4, muted=False)
+    mock_pipewire.add_node(n_stream)
+    QtCore.QCoreApplication.processEvents()
+
+    # Load Audio.qml singleton from QML Engine
+    audio = qml_engine.singletonInstance("qs.services", "Audio")
+    if not audio:
+        raise RuntimeError("Failed to obtain Audio singleton instance from QML engine")
+        
+    # Register "Audio" as context property so UI can resolve it
+    qml_engine.rootContext().setContextProperty("Audio", audio)
+    
+    # Load UI
+    ui_comp = QQmlComponent(qml_engine, UI_QML_PATH)
+    popouts = MockPopoutState()
+    ui = ui_comp.beginCreate(qml_engine.rootContext())
+    if ui:
+        ui.setProperty("popouts", popouts)
+        ui_comp.completeCreate()
+    else:
+        raise RuntimeError(f"Failed to load UI: {ui_comp.errors()}")
+        
+    # Spin event loop to ensure Repeater delegates are created
+    for _ in range(10):
+        QtCore.QCoreApplication.processEvents()
+
+    def find_visual_children(item, class_name=None):
+        result = []
+        if hasattr(item, "childItems"):
+            for child in item.childItems():
+                if class_name is None or class_name in child.metaObject().className():
+                    result.append(child)
+                result.extend(find_visual_children(child, class_name))
+        return result
+
+    # 2. Check if the stream name is displayed in the UI
+    texts = find_visual_children(ui, "Text")
+    stream_text = [t for t in texts if t.property("text") == "Spotify"]
+    
+    assert len(stream_text) == 1, "Should display stream name in UI"
+
+    # 3. Find the IconButton for the stream
+    buttons = find_visual_children(ui, "IconButton")
+    stream_mute_btn = [b for b in buttons if b.property("icon") == "volume_up"]
+    assert len(stream_mute_btn) == 1, "Should find stream mute button"
+
+    # 4. Find the StyledSlider for the stream
+    sliders = find_visual_children(ui, "StyledSlider")
+    stream_slider = [s for s in sliders if s.property("value") == 0.4]
+    assert len(stream_slider) == 1, "Should find stream slider with value 0.4"
+
+    # 5. Simulate volume interaction (user drags the stream slider to 0.85)
+    stream_slider[0].interaction.emit(0.85)
+    QtCore.QCoreApplication.processEvents()
+    
+    # Verify the volume gets updated on the mock pipewire node
+    assert abs(n_stream.audio.property("volume") - 0.85) < 0.01, "Stream volume should update to 0.85"
+    assert stream_slider[0].property("value") == 0.85, "Stream slider value should update to 0.85"
+
+    # 6. Simulate mute interaction (user clicks the stream mute button)
+    stream_mute_btn[0].clicked.emit()
+    QtCore.QCoreApplication.processEvents()
+
+    # Verify the muted state gets updated on the mock pipewire node
+    assert n_stream.audio.property("muted") == True, "Stream should be muted"
+    assert stream_mute_btn[0].property("icon") == "volume_off", "Stream mute button icon should change to volume_off"
+
+    # 7. Unmute stream
+    stream_mute_btn[0].clicked.emit()
+    QtCore.QCoreApplication.processEvents()
+    assert n_stream.audio.property("muted") == False, "Stream should be unmuted"
+    assert stream_mute_btn[0].property("icon") == "volume_up", "Stream mute button icon should change to volume_up"
+
+    ui.deleteLater()

@@ -21,6 +21,11 @@ Item {
 
     signal editingFinished
 
+    function clear(): void {
+        text = "";
+        inputField.text = "";
+    }
+
     implicitWidth: 70
     implicitHeight: inputField.implicitHeight + Tokens.padding.small
 

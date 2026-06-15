@@ -30,12 +30,19 @@ Searcher {
     }
 
     function setRandom(): void {
-        Quickshell.execDetached(["caelestia", "wallpaper", "-r", ...smartArg]);
+        const entries = root.list;
+        if (entries && entries.length > 0) {
+            const idx = Math.floor(Math.random() * entries.length);
+            const path = entries[idx].path;
+            setWallpaper(path);
+        } else {
+            setWallpaper(root.fallback);
+        }
     }
 
     function setWallpaper(path: string): void {
         actualCurrent = path;
-        Quickshell.execDetached(["caelestia", "wallpaper", "-f", path, ...smartArg]);
+        Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", path]);
     }
 
     function preview(path: string): void {
@@ -59,7 +66,7 @@ Searcher {
             Colours.showPreview = false;
     }
 
-    list: wallpapers.entries
+    list: wallpapers ? wallpapers.entries : []
     key: "relativePath"
     useFuzzy: GlobalConfig.launcher.useFuzzy.wallpapers
     extraOpts: useFuzzy ? ({}) : ({
@@ -91,7 +98,7 @@ Searcher {
             let wall = text().trim();
             if (!wall) {
                 wall = root.fallback;
-                Quickshell.execDetached(["caelestia", "wallpaper", "-f", root.fallback, ...root.smartArg]);
+                Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", root.fallback]);
             }
             root.actualCurrent = wall;
             root.previewColourLock = false;
@@ -99,7 +106,7 @@ Searcher {
         onLoadFailed: {
             root.actualCurrent = root.fallback;
             root.previewColourLock = false;
-            Quickshell.execDetached(["caelestia", "wallpaper", "-f", root.fallback, ...root.smartArg]);
+            Quickshell.execDetached(["/home/execorn/ricing/shell/scripts/apply-theme.py", "--wallpaper", root.fallback]);
         }
     }
 

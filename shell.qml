@@ -9,6 +9,7 @@ import "modules/drawers"
 import "modules/background"
 import "modules/areapicker"
 import "modules/lock"
+import "modules/overview"
 import Quickshell
 import QtQuick
 
@@ -26,6 +27,8 @@ ShellRoot {
         id: lock
     }
 
+    Overview {}
+
     ConfigToasts {}
     Shortcuts {}
     BatteryMonitor {}
@@ -38,3 +41,4 @@ ShellRoot {
         let _2 = Hypr;
     }
 }
+

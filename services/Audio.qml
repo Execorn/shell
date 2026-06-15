@@ -251,6 +251,7 @@ Singleton {
 
     function syncNodes(): void {
         if (!Pipewire || !Pipewire.nodes) return;
+        console.log("[JS LOG] syncNodes called. Pipewire.nodes.values length:", Pipewire.nodes.values.length, "values:", Pipewire.nodes.values);
 
         const newSinks = [];
         const newSources = [];
