@@ -19,6 +19,24 @@ ColumnLayout {
     required property bool fullscreen
     readonly property int vPadding: Tokens.padding.large
 
+    readonly property int firstEnabledIndex: {
+        for (let i = 0; i < repeater.count; i++) {
+            const item = repeater.itemAt(i);
+            if (item?.enabled)
+                return i;
+        }
+        return -1;
+    }
+
+    readonly property int lastEnabledIndex: {
+        for (let i = repeater.count - 1; i >= 0; i--) {
+            const item = repeater.itemAt(i);
+            if (item?.enabled)
+                return i;
+        }
+        return -1;
+    }
+
     function closeTray(): void {
         if (!Config.bar.tray.compact)
             return;
@@ -181,31 +199,12 @@ ColumnLayout {
         required property string id
         required property int index
 
-        function findFirstEnabled(): Item {
-            const count = repeater.count;
-            for (let i = 0; i < count; i++) {
-                const item = repeater.itemAt(i);
-                if (item?.enabled)
-                    return item;
-            }
-            return null;
-        }
-
-        function findLastEnabled(): Item {
-            for (let i = repeater.count - 1; i >= 0; i--) {
-                const item = repeater.itemAt(i);
-                if (item?.enabled)
-                    return item;
-            }
-            return null;
-        }
-
         asynchronous: true
         Layout.alignment: Qt.AlignHCenter
 
         // Cursed ahh thing to add padding to first and last enabled components
-        Layout.topMargin: findFirstEnabled() === this ? root.vPadding : 0
-        Layout.bottomMargin: findLastEnabled() === this ? root.vPadding : 0
+        Layout.topMargin: root.firstEnabledIndex === index ? root.vPadding : 0
+        Layout.bottomMargin: root.lastEnabledIndex === index ? root.vPadding : 0
 
         visible: enabled
         active: enabled
