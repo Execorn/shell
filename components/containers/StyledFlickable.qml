@@ -6,6 +6,7 @@ Flickable {
 
     property bool doneFakeFlick
 
+    clip: true
     maximumFlickVelocity: 3000
 
     rebound: Transition {

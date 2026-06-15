@@ -15,7 +15,12 @@ Singleton {
     property var requestQueue: []
     property string lastError: ""
 
-    readonly property ListModel chatHistory: ListModel {}
+    readonly property ListModel chatHistory: ListModel {
+        ListElement {
+            role: "assistant"
+            message: "Hello! I am your Caelestia AI Copilot. How can I help you customize or control your desktop today?"
+        }
+    }
 
     function clearChat(): void {
         chatHistory.clear();

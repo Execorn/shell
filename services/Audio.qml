@@ -36,7 +36,7 @@ Singleton {
     readonly property alias beatTracker: beatTracker
 
     function isNodeValid(node: var): bool {
-        return !!node && !!Pipewire && !!Pipewire.nodes && Pipewire.nodes.indexOf(node) !== -1 && node.ready;
+        return !!node && !!Pipewire && !!Pipewire.nodes && Pipewire.nodes.values.indexOf(node) !== -1 && node.ready;
     }
 
     function setVolume(newVolume: real): void {

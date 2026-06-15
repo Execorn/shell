@@ -109,6 +109,8 @@ Scope {
                                     radius: 12
 
                                     readonly property int windowCount: Hypr.toplevels.values.filter(c => c && c.workspace && c.workspace.id === card.wsId).length
+                                    readonly property var wsObj: Hypr.workspaces.values.find(w => w.id === card.wsId)
+                                    readonly property string monitorName: wsObj?.lastIpcObject?.monitor ?? ""
 
                                     // Display Workspace Number
                                     Text {
@@ -152,6 +154,18 @@ Scope {
                                         visible: card.windowCount === 0
                                     }
 
+                                    // Display Monitor Name if active
+                                    Text {
+                                        anchors.bottom: parent.bottom
+                                        anchors.left: parent.left
+                                        anchors.margins: 10
+                                        text: card.monitorName
+                                        color: Colours.palette.m3outline
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        visible: card.monitorName !== ""
+                                    }
+
                                     // Drop Area for workspace window drag-n-drop
                                     DropArea {
                                         id: dropArea
@@ -184,10 +198,47 @@ Scope {
                                             objectName: "windowThumbnail"
                                             required property var modelData
 
-                                            readonly property real scaleX: win.screen ? (modelData.lastIpcObject?.at?.[0] - win.screen.x) * (grid.cardWidth / win.screen.width) : 0
-                                            readonly property real scaleY: win.screen ? (modelData.lastIpcObject?.at?.[1] - win.screen.y) * (grid.cardHeight / win.screen.height) : 0
-                                            readonly property real scaleW: win.screen ? (modelData.lastIpcObject?.size?.[0]) * (grid.cardWidth / win.screen.width) : 0
-                                            readonly property real scaleH: win.screen ? (modelData.lastIpcObject?.size?.[1]) * (grid.cardHeight / win.screen.height) : 0
+                                            readonly property var monitorObj: {
+                                                const monitorId = modelData.lastIpcObject?.monitor;
+                                                if (monitorId !== undefined) {
+                                                    const monitors = Hypr.monitors.values;
+                                                    for (let i = 0; i < monitors.length; i++) {
+                                                        if (monitors[i].id === monitorId) {
+                                                            return monitors[i];
+                                                        }
+                                                    }
+                                                }
+                                                return null;
+                                            }
+
+                                            readonly property real mX: {
+                                                const val = monitorObj?.lastIpcObject?.x;
+                                                if (val !== undefined) return val;
+                                                return win.screen ? win.screen.x : 0;
+                                            }
+
+                                            readonly property real mY: {
+                                                const val = monitorObj?.lastIpcObject?.y;
+                                                if (val !== undefined) return val;
+                                                return win.screen ? win.screen.y : 0;
+                                            }
+
+                                            readonly property real mW: {
+                                                const val = monitorObj?.lastIpcObject?.width;
+                                                if (val !== undefined && val > 0) return val;
+                                                return win.screen ? win.screen.width : 1920;
+                                            }
+
+                                            readonly property real mH: {
+                                                const val = monitorObj?.lastIpcObject?.height;
+                                                if (val !== undefined && val > 0) return val;
+                                                return win.screen ? win.screen.height : 1080;
+                                            }
+
+                                            readonly property real scaleX: (modelData.lastIpcObject?.at?.[0] - mX) * (grid.cardWidth / mW)
+                                            readonly property real scaleY: (modelData.lastIpcObject?.at?.[1] - mY) * (grid.cardHeight / mH)
+                                            readonly property real scaleW: (modelData.lastIpcObject?.size?.[0]) * (grid.cardWidth / mW)
+                                            readonly property real scaleH: (modelData.lastIpcObject?.size?.[1]) * (grid.cardHeight / mH)
 
                                             x: scaleX
                                             y: scaleY
