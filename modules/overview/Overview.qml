@@ -103,14 +103,28 @@ Scope {
                                     Component.onCompleted: console.log("CARD delegate completed, wsId:", wsId)
                                     width: grid.cardWidth
                                     height: grid.cardHeight
-                                    color: Hypr.activeWsId === wsId ? Colours.layer(Colours.palette.m3primaryContainer, 1) : Colours.layer(Colours.palette.m3surfaceContainerLow, 1)
-                                    border.color: dropArea.containsDrag ? Colours.palette.m3primary : (Hypr.activeWsId === wsId ? Colours.palette.m3primary : Colours.palette.m3outlineVariant)
-                                    border.width: (dropArea.containsDrag || Hypr.activeWsId === wsId) ? 2 : 1
-                                    radius: 12
 
+                                    readonly property bool isVisible: Hypr.monitors.values.some(m => m.activeWorkspace && m.activeWorkspace.id === card.wsId)
                                     readonly property int windowCount: Hypr.toplevels.values.filter(c => c && c.workspace && c.workspace.id === card.wsId).length
                                     readonly property var wsObj: Hypr.workspaces.values.find(w => w.id === card.wsId)
                                     readonly property string monitorName: wsObj?.lastIpcObject?.monitor ?? ""
+
+                                    color: Hypr.activeWsId === wsId 
+                                        ? Colours.layer(Colours.palette.m3primaryContainer, 1) 
+                                        : (card.isVisible 
+                                            ? Colours.layer(Colours.palette.m3secondaryContainer, 1) 
+                                            : Colours.layer(Colours.palette.m3surfaceContainerLow, 1))
+
+                                    border.color: dropArea.containsDrag 
+                                        ? Colours.palette.m3primary 
+                                        : (Hypr.activeWsId === wsId 
+                                            ? Colours.palette.m3primary 
+                                            : (card.isVisible 
+                                                ? Colours.palette.m3secondary 
+                                                : Colours.palette.m3outlineVariant))
+
+                                    border.width: (dropArea.containsDrag || Hypr.activeWsId === wsId || card.isVisible) ? 2 : 1
+                                    radius: 12
 
                                     // Display Workspace Number
                                     Text {
@@ -118,7 +132,11 @@ Scope {
                                         anchors.left: parent.left
                                         anchors.margins: 10
                                         text: card.wsId.toString()
-                                        color: Hypr.activeWsId === card.wsId ? Colours.palette.m3primary : Colours.palette.m3outline
+                                        color: Hypr.activeWsId === card.wsId 
+                                            ? Colours.palette.m3primary 
+                                            : (card.isVisible 
+                                                ? Colours.palette.m3secondary 
+                                                : Colours.palette.m3outline)
                                         font.bold: true
                                         font.pixelSize: 16
                                     }
@@ -160,7 +178,11 @@ Scope {
                                         anchors.left: parent.left
                                         anchors.margins: 10
                                         text: card.monitorName
-                                        color: Colours.palette.m3outline
+                                        color: Hypr.activeWsId === card.wsId 
+                                            ? Colours.palette.m3primary 
+                                            : (card.isVisible 
+                                                ? Colours.palette.m3secondary 
+                                                : Colours.palette.m3outline)
                                         font.pixelSize: 10
                                         font.bold: true
                                         visible: card.monitorName !== ""
