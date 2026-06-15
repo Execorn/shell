@@ -16,6 +16,14 @@ Singleton {
     property bool running: false
     property string lastError: ""
     property string activeDrawer: ""
+    property bool startupGraceActive: true
+
+    readonly property Timer startupGraceTimer: Timer {
+        interval: 1500
+        running: true
+        repeat: false
+        onTriggered: root.startupGraceActive = false
+    }
 
     readonly property string user: Quickshell.env("USER") || "default"
     readonly property string tempPath: "/tmp/ocr_capture_" + (Quickshell.env("USER") || "user") + "_" + Math.floor(Math.random() * 10000) + ".png"
@@ -235,7 +243,11 @@ Singleton {
         name: "ocr"
         description: "Trigger screen OCR"
         onPressed: {
-            root.startOcr();
+            if (!root.startupGraceActive) {
+                root.startOcr();
+            } else {
+                console.log("[Ocr.qml] Ignoring shortcut trigger during startup grace period");
+            }
         }
     }
 }

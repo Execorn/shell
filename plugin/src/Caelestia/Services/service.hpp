@@ -10,6 +10,7 @@ class Service : public QObject {
 
 public:
     explicit Service(QObject* parent = nullptr);
+    virtual ~Service();
 
     void ref(QObject* sender);
     void unref(QObject* sender);

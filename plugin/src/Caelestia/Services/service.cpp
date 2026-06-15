@@ -7,6 +7,13 @@ namespace caelestia::services {
 Service::Service(QObject* parent)
     : QObject(parent) {}
 
+Service::~Service() {
+    for (QObject* ref : m_refs) {
+        QObject::disconnect(ref, &QObject::destroyed, this, &Service::unref);
+    }
+    m_refs.clear();
+}
+
 void Service::ref(QObject* sender) {
     if (m_refs.isEmpty()) {
         start();
