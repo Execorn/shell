@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.utils
+import qs.components.misc
 
 Singleton {
     id: root
@@ -127,5 +128,20 @@ Singleton {
         };
 
         xhr.send(JSON.stringify(payload));
+    }
+
+    IpcHandler {
+        target: "ocr"
+        function start(): void {
+            root.startOcr();
+        }
+    }
+
+    CustomShortcut {
+        name: "ocr"
+        description: "Trigger screen OCR"
+        onPressed: {
+            root.startOcr();
+        }
     }
 }
