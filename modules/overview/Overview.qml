@@ -1,11 +1,15 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import Quickshell.Wayland
 import Quickshell.Io
+import qs.components
 import qs.components.containers
 import qs.components.misc
+import qs.components.effects
 import qs.services
 
 Scope {
@@ -99,10 +103,12 @@ Scope {
                                     Component.onCompleted: console.log("CARD delegate completed, wsId:", wsId)
                                     width: grid.cardWidth
                                     height: grid.cardHeight
-                                    color: Hypr.activeWsId === wsId ? "#223b82f6" : "#1a212124"
-                                    border.color: dropArea.containsDrag ? "#3b82f6" : (Hypr.activeWsId === wsId ? "#3b82f6" : "#44ffffff")
-                                    border.width: dropArea.containsDrag ? 2 : 1
+                                    color: Hypr.activeWsId === wsId ? Colours.layer(Colours.palette.m3primaryContainer, 1) : Colours.layer(Colours.palette.m3surfaceContainerLow, 1)
+                                    border.color: dropArea.containsDrag ? Colours.palette.m3primary : (Hypr.activeWsId === wsId ? Colours.palette.m3primary : Colours.palette.m3outlineVariant)
+                                    border.width: (dropArea.containsDrag || Hypr.activeWsId === wsId) ? 2 : 1
                                     radius: 12
+
+                                    readonly property int windowCount: Hypr.toplevels.values.filter(c => c && c.workspace && c.workspace.id === card.wsId).length
 
                                     // Display Workspace Number
                                     Text {
@@ -110,9 +116,40 @@ Scope {
                                         anchors.left: parent.left
                                         anchors.margins: 10
                                         text: card.wsId.toString()
-                                        color: Hypr.activeWsId === card.wsId ? "#3b82f6" : "#88ffffff"
+                                        color: Hypr.activeWsId === card.wsId ? Colours.palette.m3primary : Colours.palette.m3outline
                                         font.bold: true
                                         font.pixelSize: 16
+                                    }
+
+                                    // Display Window Count
+                                    RowLayout {
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.margins: 10
+                                        spacing: 4
+                                        visible: card.windowCount > 0
+
+                                        MaterialIcon {
+                                            text: "content_copy"
+                                            color: Colours.palette.m3outline
+                                            fontStyle: Tokens.font.icon.small
+                                        }
+
+                                        StyledText {
+                                            text: card.windowCount.toString()
+                                            color: Colours.palette.m3outline
+                                            font: Tokens.font.body.small
+                                        }
+                                    }
+
+                                    // Empty Placeholder
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: qsTr("Empty Workspace")
+                                        color: Colours.palette.m3outline
+                                        font.pixelSize: 11
+                                        font.italic: true
+                                        visible: card.windowCount === 0
                                     }
 
                                     // Drop Area for workspace window drag-n-drop
@@ -165,18 +202,93 @@ Scope {
                                                 id: visualRect
                                                 width: parent.width
                                                 height: parent.height
-                                                color: dragArea.drag.active ? "#dd3b82f6" : "#66ffffff"
-                                                border.color: dragArea.drag.active ? "#3b82f6" : "#88ffffff"
-                                                border.width: 1.5
+                                                color: dragArea.drag.active 
+                                                    ? Colours.layer(Colours.palette.m3primaryContainer, 3)
+                                                    : (dragArea.containsMouse ? Colours.layer(Colours.palette.m3surfaceVariant, 4) : Colours.layer(Colours.palette.m3surfaceVariant, 1))
+                                                opacity: dragArea.drag.active ? 0.95 : 0.8
+                                                border.color: dragArea.drag.active 
+                                                    ? Colours.palette.m3primary 
+                                                    : (dragArea.containsMouse ? Colours.palette.m3primary : Colours.palette.m3outline)
+                                                border.width: (dragArea.drag.active || dragArea.containsMouse) ? 2 : 1
+                                                radius: 8
+
+                                                // Scaling on Hover
+                                                scale: dragArea.containsMouse ? 1.05 : 1.0
+                                                Behavior on scale {
+                                                    NumberAnimation { duration: 150; easing.type: Easing.OutQuad }
+                                                }
+                                                Behavior on border.color {
+                                                    ColorAnimation { duration: 150 }
+                                                }
+                                                Behavior on color {
+                                                    ColorAnimation { duration: 150 }
+                                                }
+
+                                                ColumnLayout {
+                                                    anchors.fill: parent
+                                                    anchors.margins: 4
+                                                    spacing: 2
+
+                                                    RowLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 4
+                                                        Layout.alignment: Qt.AlignTop
+
+                                                        IconImage {
+                                                            asynchronous: true
+                                                            source: Quickshell.iconPath(modelData.lastIpcObject?.class?.toLowerCase() ?? "", "application-x-executable")
+                                                            Layout.preferredWidth: Math.min(parent.height * 0.8, 14)
+                                                            Layout.preferredHeight: Layout.preferredWidth
+                                                            Layout.alignment: Qt.AlignVCenter
+                                                        }
+
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.lastIpcObject?.class ?? "App"
+                                                            color: Colours.palette.m3onSurfaceVariant
+                                                            font.pixelSize: 8
+                                                            font.bold: true
+                                                            elide: Text.ElideRight
+                                                            visible: parent.width > 35 && parent.height > 12
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        Layout.fillHeight: true
+                                                        text: thumbnail.title
+                                                        color: Colours.palette.m3onSurface
+                                                        font.pixelSize: 8
+                                                        wrapMode: Text.WordWrap
+                                                        elide: Text.ElideRight
+                                                        visible: parent.width > 50 && parent.height > 25
+                                                    }
+                                                }
+                                            }
+
+                                            // Hover title bubble
+                                            Rectangle {
+                                                id: hoverBubble
+                                                visible: dragArea.containsMouse && thumbnail.title !== ""
+                                                anchors.bottom: visualRect.top
+                                                anchors.horizontalCenter: visualRect.horizontalCenter
+                                                anchors.bottomMargin: 6
+                                                width: hoverText.implicitWidth + 12
+                                                height: hoverText.implicitHeight + 6
+                                                color: Colours.palette.m3surfaceContainerHighest
+                                                border.color: Colours.palette.m3primary
+                                                border.width: 1
                                                 radius: 6
+                                                z: 99
 
                                                 Text {
+                                                    id: hoverText
                                                     anchors.centerIn: parent
                                                     text: thumbnail.title
-                                                    color: "white"
+                                                    color: Colours.palette.m3onSurface
                                                     font.pixelSize: 9
+                                                    font.bold: true
                                                     elide: Text.ElideRight
-                                                    width: parent.width - 6
                                                     horizontalAlignment: Text.AlignHCenter
                                                 }
                                             }
@@ -190,6 +302,7 @@ Scope {
                                                 id: dragArea
                                                 objectName: "dragMouseArea"
                                                 anchors.fill: parent
+                                                hoverEnabled: true
                                                 drag.target: visualRect
 
                                                 onPressed: {
@@ -197,9 +310,9 @@ Scope {
                                                 }
 
                                                 onReleased: {
-                                                    visualRect.x = 0;
-                                                    visualRect.y = 0;
-                                                    visualRect.anchors.fill = parent;
+                                                     visualRect.x = 0;
+                                                     visualRect.y = 0;
+                                                     visualRect.anchors.fill = parent;
                                                 }
                                             }
                                         }

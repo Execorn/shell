@@ -61,7 +61,10 @@ Item {
                     width: chatListView.width
                     height: bubbleRect.height + Tokens.spacing.medium
 
-                    readonly property bool isUser: model.role === "user"
+                    required property string role
+                    required property string message
+
+                    readonly property bool isUser: role === "user"
 
                     StyledRect {
                         id: bubbleRect
@@ -88,7 +91,7 @@ Item {
                             wrapMode: Text.WordWrap
                             textFormat: Text.AutoText
                             color: isUser ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
-                            text: model.message
+                            text: message
                         }
                     }
                 }

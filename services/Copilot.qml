@@ -177,10 +177,12 @@ Singleton {
     }
 
     function executeActionsFromText(text: string): void {
-        // Find markdown JSON blocks
-        const regex = /```json\s*([\s\S]*?)\s*```/g;
+        let found = false;
+        // Match both ```json ... ``` and ``` ... ``` blocks (case-insensitive and optional json tag)
+        const regex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
         let match;
         while ((match = regex.exec(text)) !== null) {
+            found = true;
             const jsonStr = match[1].trim();
             try {
                 const actionObj = JSON.parse(jsonStr);
@@ -193,6 +195,27 @@ Singleton {
                 }
             } catch (e) {
                 console.warn("[Copilot.qml] Failed to parse action block:", jsonStr, e);
+            }
+        }
+
+        // Fallback: If no markdown blocks were found, look for first '{' and last '}'
+        if (!found) {
+            const startIdx = text.indexOf("{");
+            const endIdx = text.lastIndexOf("}");
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+                const jsonStr = text.slice(startIdx, endIdx + 1).trim();
+                try {
+                    const actionObj = JSON.parse(jsonStr);
+                    if (Array.isArray(actionObj)) {
+                        for (let i = 0; i < actionObj.length; i++) {
+                            executeSingleAction(actionObj[i]);
+                        }
+                    } else if (actionObj.action) {
+                        executeSingleAction(actionObj);
+                    }
+                } catch (e) {
+                    console.warn("[Copilot.qml] Fallback JSON parse failed:", jsonStr, e);
+                }
             }
         }
     }

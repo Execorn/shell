@@ -26,6 +26,7 @@ Item {
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
@@ -109,6 +110,7 @@ Item {
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
+            clip: true
 
             CopilotChat {
                 anchors.fill: parent

@@ -107,19 +107,27 @@ Singleton {
             }
         }
         
-        // 2. Look for USB audio cards / speakers
+        // 2. Look for USB audio cards / speakers (excluding microphones/inputs)
         for (let i = 0; i < physicalSinks.length; i++) {
             const s = physicalSinks[i];
             if (isNodeValid(s) && s.name && (s.name.indexOf("alsa_output.usb") === 0 || s.name.indexOf("usb-") !== -1)) {
-                return s.name;
+                const nameLower = s.name.toLowerCase();
+                const isMic = nameLower.indexOf("micro") !== -1 || nameLower.indexOf("mic") !== -1 || nameLower.indexOf("input") !== -1;
+                if (!isMic) {
+                    return s.name;
+                }
             }
         }
         
-        // 3. Fallback to any physical sink that is not the built-in speaker, just in case
+        // 3. Fallback to any physical sink that is not the built-in speaker and not a mic, just in case
         for (let i = 0; i < physicalSinks.length; i++) {
             const s = physicalSinks[i];
             if (isNodeValid(s) && s.name && s.name !== "alsa_output.pci-0000_05_00.6.analog-stereo" && s.name.indexOf("pci-") === -1) {
-                return s.name;
+                const nameLower = s.name.toLowerCase();
+                const isMic = nameLower.indexOf("micro") !== -1 || nameLower.indexOf("mic") !== -1 || nameLower.indexOf("input") !== -1;
+                if (!isMic) {
+                    return s.name;
+                }
             }
         }
         
