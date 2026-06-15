@@ -17,9 +17,10 @@ public:
 
 private:
     QSet<QObject*> m_refs;
+    bool m_destroying = false;
 
-    virtual void start() = 0;
-    virtual void stop() = 0;
+    virtual void start() {}
+    virtual void stop() {}
 };
 
 } // namespace caelestia::services

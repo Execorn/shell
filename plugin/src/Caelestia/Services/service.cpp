@@ -8,6 +8,7 @@ Service::Service(QObject* parent)
     : QObject(parent) {}
 
 Service::~Service() {
+    m_destroying = true;
     for (QObject* ref : m_refs) {
         QObject::disconnect(ref, &QObject::destroyed, this, &Service::unref);
     }
@@ -15,6 +16,9 @@ Service::~Service() {
 }
 
 void Service::ref(QObject* sender) {
+    if (m_destroying) {
+        return;
+    }
     if (m_refs.isEmpty()) {
         start();
     }
@@ -24,6 +28,9 @@ void Service::ref(QObject* sender) {
 }
 
 void Service::unref(QObject* sender) {
+    if (m_destroying) {
+        return;
+    }
     if (m_refs.remove(sender) && m_refs.isEmpty()) {
         stop();
     }

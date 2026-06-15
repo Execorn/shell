@@ -20,7 +20,7 @@ public slots:
     void stop();
 
 protected:
-    virtual void process() = 0;
+    virtual void process() {}
 
 private:
     QTimer* m_timer = nullptr;

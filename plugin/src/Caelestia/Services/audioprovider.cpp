@@ -47,7 +47,9 @@ AudioProvider::~AudioProvider() {
         m_thread->quit();
         m_thread->wait();
     }
-    delete m_processor;
+    auto* processor = m_processor;
+    m_processor = nullptr;
+    delete processor;
 }
 
 void AudioProvider::init() {
@@ -60,8 +62,6 @@ void AudioProvider::init() {
     m_processor->moveToThread(m_thread);
 
     connect(m_thread, &QThread::started, m_processor, &AudioProcessor::init);
-    connect(m_thread, &QThread::finished, m_processor, &AudioProcessor::deleteLater);
-    connect(m_thread, &QThread::finished, m_thread, &QThread::deleteLater);
 
     m_thread->start();
 }

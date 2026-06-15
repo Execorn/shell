@@ -11,6 +11,7 @@ class TickingService : public Service {
 
 public:
     explicit TickingService(QObject* parent = nullptr);
+    ~TickingService() override;
 
     [[nodiscard]] int updateInterval() const;
 
@@ -21,7 +22,7 @@ protected:
     void start() final;
     void stop() final;
 
-    virtual void tick() = 0;
+    virtual void tick() {}
 
 private:
     void applyInterval(int ms);

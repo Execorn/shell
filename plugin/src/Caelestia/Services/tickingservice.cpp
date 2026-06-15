@@ -20,6 +20,12 @@ TickingService::TickingService(QObject* parent)
     });
 }
 
+TickingService::~TickingService() {
+    if (m_timer) {
+        m_timer->stop();
+    }
+}
+
 int TickingService::updateInterval() const {
     return m_interval;
 }
