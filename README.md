@@ -21,6 +21,13 @@ This is a personal fork of the original [caelestia-dots/shell](https://github.co
 - **Weather Widget Live Geocoding Search**:
   - Added a search bar to the Weather dashboard tab that contacts the Open-Meteo Geocoding API to dynamically load 7-day forecasts for any city.
   - Handled interactive desktop window focus grab to allow keyboard input when typing search queries.
+- **Screen OCR & Translation**:
+  - Triggers interactive region capture (`slurp` + `grim`) and runs OCR extraction (`tesseract`).
+  - Employs a robust two-stage subprocess workflow, ensuring OCR only triggers after screenshot region selection successfully completes.
+- **Transparent Notifications Background**:
+  - Removed the surrounding dark background shape of the notification drawer, leaving it completely transparent so only the styled cards themselves render over the desktop.
+- **AI Copilot Sidebar**:
+  - Integrates a conversational desktop assistant sidebar tab with LLM APIs (Ollama/Gemini) to execute actions (volume adjustments, launcher drawers, workspaces) using parsed JSON code blocks.
 
 ---
 
