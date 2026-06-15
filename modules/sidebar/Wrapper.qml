@@ -36,11 +36,13 @@ Item {
 
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Content {
-            implicitWidth: Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins
-            props: root.props
-            visibilities: root.visibilities
-            utilitiesProps: root.utilitiesProps
+        sourceComponent: Component {
+            Content {
+                implicitWidth: Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins
+                props: root.props
+                visibilities: root.visibilities
+                utilitiesProps: root.utilitiesProps
+            }
         }
     }
 }

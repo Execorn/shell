@@ -100,14 +100,16 @@ Item {
         asynchronous: true
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Content {
-            monitor: root.monitor
-            visibilities: root.visibilities
-            volume: root.volume
-            muted: root.muted
-            sourceVolume: root.sourceVolume
-            sourceMuted: root.sourceMuted
-            brightness: root.brightness
+        sourceComponent: Component {
+            Content {
+                monitor: root.monitor
+                visibilities: root.visibilities
+                volume: root.volume
+                muted: root.muted
+                sourceVolume: root.sourceVolume
+                sourceMuted: root.sourceMuted
+                brightness: root.brightness
+            }
         }
     }
 }

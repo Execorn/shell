@@ -187,6 +187,8 @@ void AppDb::setFavouriteApps(const QStringList& favApps) {
         }
     }
 
+    m_favouriteCache.clear();
+    m_sortedAppsDirty = true;
     emit appsChanged();
 }
 
@@ -216,6 +218,7 @@ void AppDb::incrementFrequency(const QString& id) {
     if (app) {
         const auto before = getSortedApps();
         app->incrementFrequency();
+        m_sortedAppsDirty = true;
         getSortedApps();
         if (before != m_sortedApps) {
             emit appsChanged();
@@ -226,6 +229,10 @@ void AppDb::incrementFrequency(const QString& id) {
 }
 
 QList<AppEntry*>& AppDb::getSortedApps() const {
+    if (!m_sortedAppsDirty) {
+        return m_sortedApps;
+    }
+
     m_sortedApps = m_apps.values();
 
     // Pre-compute favourite status to avoid repeated regex matching during sort
@@ -245,16 +252,30 @@ QList<AppEntry*>& AppDb::getSortedApps() const {
             return a->frequency() > b->frequency();
         return a->name().localeAwareCompare(b->name()) < 0;
     });
+
+    m_sortedAppsDirty = false;
     return m_sortedApps;
 }
 
 bool AppDb::isFavourite(const AppEntry* app) const {
+    if (!app) {
+        return false;
+    }
+    const QString id = app->id();
+    auto it = m_favouriteCache.constFind(id);
+    if (it != m_favouriteCache.constEnd()) {
+        return it.value();
+    }
+
+    bool fav = false;
     for (const QRegularExpression& re : m_favouriteAppsRegex) {
-        if (re.match(app->id()).hasMatch()) {
-            return true;
+        if (re.match(id).hasMatch()) {
+            fav = true;
+            break;
         }
     }
-    return false;
+    m_favouriteCache.insert(id, fav);
+    return fav;
 }
 
 quint32 AppDb::getFrequency(const QString& id) const {
@@ -278,6 +299,7 @@ void AppDb::updateAppFrequencies() {
         app->setFrequency(getFrequency(app->id()));
     }
 
+    m_sortedAppsDirty = true;
     getSortedApps();
     if (before != m_sortedApps) {
         emit appsChanged();
@@ -294,6 +316,8 @@ void AppDb::updateApps() {
             auto* const newEntry = new AppEntry(entry, getFrequency(id), this);
             QObject::connect(newEntry, &QObject::destroyed, this, [id, this]() {
                 if (m_apps.remove(id)) {
+                    m_favouriteCache.remove(id);
+                    m_sortedAppsDirty = true;
                     emit appsChanged();
                 }
             });
@@ -309,6 +333,7 @@ void AppDb::updateApps() {
     for (auto it = m_apps.begin(); it != m_apps.end();) {
         if (!newIds.contains(it.key())) {
             dirty = true;
+            m_favouriteCache.remove(it.key());
             it.value()->deleteLater();
             it = m_apps.erase(it);
         } else {
@@ -317,6 +342,7 @@ void AppDb::updateApps() {
     }
 
     if (dirty) {
+        m_sortedAppsDirty = true;
         emit appsChanged();
     }
 }

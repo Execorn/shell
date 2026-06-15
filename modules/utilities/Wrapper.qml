@@ -80,12 +80,14 @@ Item {
         asynchronous: true
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Content {
-            implicitWidth: root.implicitWidth - root.totalPadding
-            props: root.props
-            visibilities: root.visibilities
-            popouts: root.popouts
-            deformMatrix: root.deformMatrix
+        sourceComponent: Component {
+            Content {
+                implicitWidth: root.implicitWidth - root.totalPadding
+                props: root.props
+                visibilities: root.visibilities
+                popouts: root.popouts
+                deformMatrix: root.deformMatrix
+            }
         }
     }
 }

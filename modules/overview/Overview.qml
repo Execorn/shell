@@ -18,6 +18,21 @@ Scope {
 
     property alias active: loader.active
 
+    readonly property var groupedWindows: {
+        let groups = {};
+        for (let i = 1; i <= 10; i++) {
+            groups[i] = [];
+        }
+        let toplevels = Hypr.toplevels.values;
+        for (let i = 0; i < toplevels.length; i++) {
+            let c = toplevels[i];
+            if (c && c.workspace && c.workspace.id >= 1 && c.workspace.id <= 10) {
+                groups[c.workspace.id].push(c);
+            }
+        }
+        return groups;
+    }
+
     // Helper functions for programmatic triggers and testing
     function dragAndDropWindow(addr, wsId) {
         let target = addr;
@@ -105,7 +120,7 @@ Scope {
                                     height: grid.cardHeight
 
                                     readonly property bool isVisible: Hypr.monitors.values.some(m => m.activeWorkspace && m.activeWorkspace.id === card.wsId)
-                                    readonly property int windowCount: Hypr.toplevels.values.filter(c => c && c.workspace && c.workspace.id === card.wsId).length
+                                    readonly property int windowCount: root.groupedWindows[card.wsId]?.length ?? 0
                                     readonly property var wsObj: Hypr.workspaces.values.find(w => w.id === card.wsId)
                                     readonly property string monitorName: wsObj?.lastIpcObject?.monitor ?? ""
 
@@ -213,7 +228,7 @@ Scope {
 
                                     // Render Window Thumbnails
                                     Repeater {
-                                        model: Hypr.toplevels.values.filter(c => c && c.workspace && c.workspace.id === card.wsId)
+                                        model: root.groupedWindows[card.wsId] ?? []
 
                                         delegate: Item {
                                             id: thumbnail

@@ -39,8 +39,10 @@ Item {
         anchors.fill: parent
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Content {
-            visibilities: root.visibilities
+        sourceComponent: Component {
+            Content {
+                visibilities: root.visibilities
+            }
         }
     }
 }

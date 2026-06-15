@@ -47,6 +47,7 @@ AudioProvider::~AudioProvider() {
         m_thread->quit();
         m_thread->wait();
     }
+    delete m_processor;
 }
 
 void AudioProvider::init() {

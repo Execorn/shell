@@ -153,7 +153,7 @@ StyledWindow {
     Item {
         anchors.fill: parent
         opacity: root.surfaceColour.a
-        layer.enabled: true
+        layer.enabled: false
         layer.effect: MultiEffect {
             shadowEnabled: true
             blurMax: 15
