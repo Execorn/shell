@@ -346,6 +346,7 @@ class MockHyprland(QObject):
     focusedWorkspaceChanged = Signal()
     focusedMonitorChanged = Signal()
     rawEvent = Signal(QObject)
+    usingLuaChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -362,6 +363,7 @@ class MockHyprland(QObject):
     activeToplevel = Property(QObject, lambda self: self._activeToplevel, notify=activeToplevelChanged)
     focusedWorkspace = Property(QObject, lambda self: self._focusedWorkspace, notify=focusedWorkspaceChanged)
     focusedMonitor = Property(QObject, lambda self: self._focusedMonitor, notify=focusedMonitorChanged)
+    usingLua = Property(bool, lambda self: False, notify=usingLuaChanged)
 
     @Slot(str)
     def dispatch(self, request):
@@ -408,12 +410,17 @@ class MockHyprDevices(QObject):
 class MockHyprExtras(QObject):
     devicesChanged = Signal()
     optionsChanged = Signal()
+    usingLuaChanged = Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self._devices = MockHyprDevices()
         self._options = QObject()
     devices = Property(QObject, lambda self: self._devices, notify=devicesChanged)
     options = Property(QObject, lambda self: self._options, notify=optionsChanged)
+    @Property(bool, notify=usingLuaChanged)
+    def usingLua(self): return False
+    @usingLua.setter
+    def usingLua(self, val): pass
     @Slot('QVariantList')
     def batchMessage(self, messages):
         print(f"MockHyprExtras.batchMessage: {messages}")
