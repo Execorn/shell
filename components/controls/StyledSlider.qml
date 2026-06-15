@@ -159,13 +159,8 @@ Slider {
         property real pressStartPos
         property real dragMovement
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-
+        anchors.fill: parent
         preventStealing: true
-        height: implicitHeight
-        implicitHeight: handle.implicitHeight
 
         onPressed: e => {
             widthBehavior.enabled = false;
