@@ -273,6 +273,7 @@ Singleton {
         const newStreams = [];
         const newPhysicalSinks = [];
         const newPhysicalSources = [];
+        const trackerObjects = [];
 
         for (const node of Pipewire.nodes.values) {
             if (!node) continue;
@@ -284,24 +285,31 @@ Singleton {
             try {
                 node.readyChanged.connect(root.syncNodes);
             } catch (e) {}
-
-            if (!node.ready) continue;
             if (!node.isStream) {
                 const isVirtual = (node.properties && node.properties["node.virtual"] === "true") || node.name === "easyeffects_sink" || node.name === "easyeffects_source";
 
                 if (node.isSink) {
-                    newSinks.push(node);
-                    if (!isVirtual) {
-                        newPhysicalSinks.push(node);
+                    trackerObjects.push(node);
+                    if (node.ready) {
+                        newSinks.push(node);
+                        if (!isVirtual) {
+                            newPhysicalSinks.push(node);
+                        }
                     }
                 } else if (node.audio) {
-                    newSources.push(node);
-                    if (!isVirtual) {
-                        newPhysicalSources.push(node);
+                    trackerObjects.push(node);
+                    if (node.ready) {
+                        newSources.push(node);
+                        if (!isVirtual) {
+                            newPhysicalSources.push(node);
+                        }
                     }
                 }
             } else if (node.audio) {
-                newStreams.push(node);
+                trackerObjects.push(node);
+                if (node.ready) {
+                    newStreams.push(node);
+                }
             }
         }
 
@@ -311,7 +319,7 @@ Singleton {
         root.physicalSinks = newPhysicalSinks;
         root.physicalSources = newPhysicalSources;
 
-        tracker.objects = [...newSinks, ...newSources, ...newStreams];
+        tracker.objects = trackerObjects;
 
         Qt.callLater(root.updateActiveSink);
     }
