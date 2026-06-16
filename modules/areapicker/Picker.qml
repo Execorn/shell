@@ -8,6 +8,7 @@ import Caelestia
 import qs.components
 import qs.components.effects
 import qs.services
+import qs.utils
 
 MouseArea {
     id: root
@@ -16,6 +17,8 @@ MouseArea {
     required property ShellScreen screen
 
     property bool onClient
+    property bool capturing: false
+    readonly property bool showSelection: (containsMouse || pressed) && !capturing
 
     property real realBorderWidth: onClient ? (Hypr.options["general:border_size"] ?? 1) : 2
     property real realRounding: onClient ? (Hypr.options["decoration:rounding"] ?? 0) : 0
@@ -74,12 +77,14 @@ MouseArea {
     }
 
     function save(): void {
-        const tmpfile = Qt.resolvedUrl(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
+        const tmpfile = "file://" + Paths.toLocalFile(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
         CUtils.saveItem(screencopy, tmpfile, Qt.rect(Math.ceil(rsx), Math.ceil(rsy), Math.floor(sw), Math.floor(sh)), path => {
+            const helper = Paths.screenshotHelper;
+            const dir = Paths.screenshotDir;
             if (root.loader.clipboardOnly) {
-                Quickshell.execDetached(["/home/execorn/scripts/screenshot_helper.sh", path, "--clip-only"]);
+                Quickshell.execDetached([helper, path, "--clip-only", dir]);
             } else {
-                Quickshell.execDetached(["/home/execorn/scripts/screenshot_helper.sh", path]);
+                Quickshell.execDetached([helper, path, "", dir]);
             }
             closeAnim.start();
         });
@@ -130,8 +135,7 @@ MouseArea {
         if (root.loader.freeze) {
             save();
         } else {
-            overlay.visible = border.visible = false;
-            screencopy.visible = false;
+            root.capturing = true;
             screencopy.active = true;
         }
     }
@@ -210,13 +214,13 @@ MouseArea {
         anchors.fill: parent
 
         active: root.loader.freeze
+        visible: root.loader.freeze
 
         sourceComponent: ScreencopyView {
             captureSource: root.screen
 
             onHasContentChanged: {
                 if (hasContent && !root.loader.freeze) {
-                    overlay.visible = border.visible = true;
                     root.save();
                 }
             }
@@ -229,8 +233,9 @@ MouseArea {
         anchors.fill: parent
         color: Colours.palette.m3secondaryContainer
         opacity: 0.3
+        visible: !root.capturing
 
-        layer.enabled: true
+        layer.enabled: root.showSelection
         layer.effect: Mask {
             maskSource: selectionWrapper
             maskInverted: true
@@ -262,6 +267,7 @@ MouseArea {
         radius: root.realRounding > 0 ? root.realRounding + root.realBorderWidth : 0
         border.width: root.realBorderWidth
         border.color: Colours.palette.m3primary
+        visible: root.showSelection
 
         x: selectionRect.x - root.realBorderWidth
         y: selectionRect.y - root.realBorderWidth

@@ -151,6 +151,14 @@ QtObject {
                 }
             }
         },
+        Component {
+            // System paths
+            StackPage {
+                Component {
+                    PathsPage {}
+                }
+            }
+        },
 
         // About
         Component {

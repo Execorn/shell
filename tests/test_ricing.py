@@ -317,6 +317,7 @@ class MockToplevelLastIpc(QObject):
     at = Property('QVariantList', lambda self: self._at, constant=True)
     size = Property('QVariantList', lambda self: self._size, constant=True)
     workspace = Property(QObject, lambda self: self._workspace, constant=True)
+    fullscreen = Property(int, lambda self: 0, constant=True)
 
 class MockHyprlandToplevel(QObject):
     def __init__(self, address="", title="", workspace=None):

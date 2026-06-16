@@ -41,6 +41,9 @@ StyledRect {
 
     Component.onCompleted: {
         root.forceActiveFocus();
+        if (root.visibilities && root.visibilities.cheatsheet) {
+            parseProcess.running = true;
+        }
     }
 
     function getSectionIcon(section) {
@@ -96,13 +99,32 @@ StyledRect {
                             desc: kb.desc,
                             action: kb.action,
                             mods: kb.mods || [],
-                            key: kb.key || ""
+                            key: kb.key || "",
+                            notInstalled: kb.notInstalled || false,
+                            appName: kb.appName || ""
                         });
                     }
                 }
             }
         }
         return results;
+    }
+
+    function executeAction(action, notInstalled, appName) {
+        if (notInstalled) {
+            Toaster.toast(qsTr("Package Not Installed"), qsTr("Package \"%1\" is not installed.").arg(appName || "unknown"), "error", Toast.Error);
+            return;
+        }
+        
+        const act = action.trim();
+        if (act.startsWith("exec ")) {
+            const cmd = act.substring(5).trim();
+            Quickshell.execDetached(["sh", "-c", cmd]);
+        } else {
+            const dispatcher = act.replace(/,\s*/, " ");
+            Hypr.dispatch(dispatcher);
+        }
+        root.visibilities.cheatsheet = false;
     }
 
     FileView {
@@ -131,8 +153,17 @@ StyledRect {
 
     Process {
         id: parseProcess
-        command: ["python3", "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"]
+        command: ["python3", Paths.cheatsheetParser]
         running: false
+        stdout: StdioCollector {
+            onStreamFinished: console.log("parser stdout:", text)
+        }
+        stderr: StdioCollector {
+            onStreamFinished: console.log("parser stderr:", text)
+        }
+        onExited: (code) => {
+            console.log("parser exited with code:", code)
+        }
     }
 
     Connections {
@@ -346,6 +377,13 @@ StyledRect {
                         border.color: Colours.tPalette.m3outlineVariant
                         border.width: 1
 
+                        StateLayer {
+                            radius: Tokens.rounding.medium
+                            onClicked: {
+                                root.executeAction(keybindRow.modelData.action, keybindRow.modelData.notInstalled, keybindRow.modelData.appName);
+                            }
+                        }
+
                         RowLayout {
                             id: rowLayout
                             anchors.left: parent.left
@@ -355,12 +393,25 @@ StyledRect {
                             anchors.rightMargin: Tokens.padding.medium
                             spacing: Tokens.spacing.medium
 
-                            StyledText {
-                                text: keybindRow.modelData.desc || keybindRow.modelData.action || ""
-                                font: Tokens.font.body.medium
-                                color: Colours.palette.m3onSurface
+                            RowLayout {
                                 Layout.fillWidth: true
-                                elide: Text.ElideRight
+                                spacing: Tokens.spacing.small
+
+                                StyledText {
+                                    text: keybindRow.modelData.desc || keybindRow.modelData.action || ""
+                                    font: Tokens.font.body.medium
+                                    color: (keybindRow.modelData && keybindRow.modelData.notInstalled) ? Colours.palette.m3error : Colours.palette.m3onSurface
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                }
+
+                                StyledText {
+                                    visible: (keybindRow.modelData && keybindRow.modelData.notInstalled) || false
+                                    text: qsTr("not installed")
+                                    font: Tokens.font.body.builders.small.weight(Font.Bold).build()
+                                    color: Colours.palette.m3error
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
                             }
 
                             RowLayout {
@@ -405,6 +456,13 @@ StyledRect {
             border.color: Colours.tPalette.m3outlineVariant
             border.width: 1
 
+            StateLayer {
+                radius: Tokens.rounding.medium
+                onClicked: {
+                    root.executeAction(searchRow.modelData.action, searchRow.modelData.notInstalled, searchRow.modelData.appName);
+                }
+            }
+
             RowLayout {
                 id: searchRowLayout
                 anchors.left: parent.left
@@ -426,12 +484,25 @@ StyledRect {
                         elide: Text.ElideRight
                     }
 
-                    StyledText {
-                        text: searchRow.modelData.desc || searchRow.modelData.action || ""
-                        font: Tokens.font.body.medium
-                        color: Colours.palette.m3onSurface
+                    RowLayout {
                         Layout.fillWidth: true
-                        elide: Text.ElideRight
+                        spacing: Tokens.spacing.small
+
+                        StyledText {
+                            text: searchRow.modelData.desc || searchRow.modelData.action || ""
+                            font: Tokens.font.body.medium
+                            color: (searchRow.modelData && searchRow.modelData.notInstalled) ? Colours.palette.m3error : Colours.palette.m3onSurface
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+
+                        StyledText {
+                            visible: (searchRow.modelData && searchRow.modelData.notInstalled) || false
+                            text: qsTr("not installed")
+                            font: Tokens.font.body.builders.small.weight(Font.Bold).build()
+                            color: Colours.palette.m3error
+                            Layout.alignment: Qt.AlignVCenter
+                        }
                     }
                 }
 

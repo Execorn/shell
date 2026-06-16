@@ -103,7 +103,7 @@ QtObject {
                     const hash = (h2 >>> 0).toString(16).padStart(8, 0) + (h1 >>> 0).toString(16).padStart(8, 0);
 
                     const cache = `${Paths.notifimagecache}/${hash}.png`;
-                    CUtils.saveItem(this, Qt.resolvedUrl(cache), () => {
+                    CUtils.saveItem(this, "file://" + Paths.toLocalFile(cache), () => {
                         notif.image = cache;
                         notif.dummyImageLoader.active = false;
                     });

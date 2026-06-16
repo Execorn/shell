@@ -267,8 +267,14 @@ Singleton {
             if (!obj) continue;
             
             const wsId = obj.workspace ? obj.workspace.id : -1;
-            if (wsId === activeWsId && !obj.floating && obj.mapped) {
-                tiled.push(obj);
+            if (wsId === activeWsId && obj.mapped) {
+                if (obj.fullscreen !== 0 && obj.fullscreen !== undefined) {
+                    console.log("[Autotile] Skipping autotile check because workspace has a fullscreen/maximized window: " + t.title);
+                    return;
+                }
+                if (!obj.floating) {
+                    tiled.push(obj);
+                }
             }
         }
 

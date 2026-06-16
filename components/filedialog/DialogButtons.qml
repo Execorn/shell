@@ -50,7 +50,7 @@ StyledRect {
 
             StateLayer {
                 disabled: !root.dialog.selectionValid
-                onClicked: root.dialog.accepted(root.folder.currentItem.modelData.path)
+                onClicked: root.dialog.acceptSelection()
             }
 
             StyledText {

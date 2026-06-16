@@ -27,7 +27,14 @@ Scope {
                 name: "area-picker"
                 WlrLayershell.exclusionMode: ExclusionMode.Ignore
                 WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.keyboardFocus: root.closing ? WlrKeyboardFocus.None : WlrKeyboardFocus.Exclusive
+                WlrLayershell.keyboardFocus: {
+                    if (root.closing) return WlrKeyboardFocus.None;
+                    const focusedName = Hypr.focusedMonitor?.name;
+                    if (focusedName) {
+                        return focusedName === win.screen.name ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None;
+                    }
+                    return win.screen.name === Screens.screens[0]?.name ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None;
+                }
                 mask: root.closing ? empty : null
 
                 anchors.top: true

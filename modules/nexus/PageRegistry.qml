@@ -74,6 +74,12 @@ QtObject {
             description: qsTr("UI language, weather location, display units"),
             category: "shell"
         },
+        {
+            label: qsTr("System paths"),
+            icon: "folder",
+            description: qsTr("Folders, helper scripts, binary commands"),
+            category: "shell"
+        },
 
         // About
         {

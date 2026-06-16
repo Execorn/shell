@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import qs.components
 import qs.services
+import qs.utils
 
 LazyLoader {
     id: loader
@@ -13,6 +14,7 @@ LazyLoader {
     property string filterLabel: "All files"
     property list<string> filters: ["*"]
     property string title: qsTr("Select a file")
+    property bool selectFolder: false
 
     signal accepted(path: string)
     signal rejected
@@ -34,10 +36,37 @@ LazyLoader {
         property list<string> cwd: loader.cwd
         property string filterLabel: loader.filterLabel
         property list<string> filters: loader.filters
+        property bool selectFolder: loader.selectFolder
+
+        readonly property string currentFolder: {
+            if (cwd[0] === "Home") {
+                return Paths.home + (cwd.length > 1 ? `/${cwd.slice(1).join("/")}` : "");
+            } else {
+                return cwd.join("/");
+            }
+        }
 
         readonly property bool selectionValid: {
+            if (selectFolder) {
+                return true;
+            }
             const file = folderContents.currentItem?.modelData;
             return (file && !file.isDir && (filters.includes("*") || filters.includes(file.suffix))) ?? false;
+        }
+
+        function acceptSelection(): void {
+            if (selectFolder) {
+                const file = folderContents.currentItem?.modelData;
+                if (file && file.isDir) {
+                    accepted(file.path);
+                } else {
+                    accepted(currentFolder);
+                }
+            } else {
+                if (selectionValid) {
+                    accepted(folderContents.currentItem.modelData.path);
+                }
+            }
         }
 
         function accepted(path: string): void {

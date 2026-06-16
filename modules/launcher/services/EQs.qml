@@ -27,7 +27,7 @@ Singleton {
         id: getPresets
 
         running: true
-        command: ["/usr/bin/python3", "-u", "/home/execorn/scripts/eq-control.py", "list-json"]
+        command: ["/usr/bin/python3", "-u", Paths.eqControlScript, "list-json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (!text.trim()) return;
@@ -50,15 +50,15 @@ Singleton {
                                 let toastIcon = "music_note";
                                 
                                 if (item.id === "on") {
-                                    cmd = ["/home/execorn/scripts/eq-control.py", "on"];
+                                    cmd = [Paths.eqControlScript, "on"];
                                     toastMsg = qsTr("Equalizer Enabled");
                                     toastIcon = "volume_up";
                                 } else if (item.id === "off") {
-                                    cmd = ["/home/execorn/scripts/eq-control.py", "off"];
+                                    cmd = [Paths.eqControlScript, "off"];
                                     toastMsg = qsTr("Equalizer Bypassed");
                                     toastIcon = "volume_off";
                                 } else {
-                                    cmd = ["/home/execorn/scripts/eq-control.py", "apply", item.id];
+                                    cmd = [Paths.eqControlScript, "apply", item.id];
                                     toastMsg = qsTr("Preset Applied: %1").arg((item.name ?? "").replace("Preset: ", ""));
                                     toastIcon = "music_note";
                                 }
@@ -91,7 +91,7 @@ Singleton {
 
         property string queryName: ""
 
-        command: ["/usr/bin/python3", "-u", "/home/execorn/scripts/eq-control.py", "download", queryName]
+        command: ["/usr/bin/python3", "-u", Paths.eqControlScript, "download", queryName]
 
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 0) {

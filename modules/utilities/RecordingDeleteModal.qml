@@ -9,6 +9,7 @@ import qs.components
 import qs.components.controls
 import qs.components.effects
 import qs.services
+import qs.utils
 
 Loader {
     id: root
@@ -194,7 +195,7 @@ Loader {
                         text: qsTr("Delete")
                         type: TextButton.Text
                         onClicked: {
-                            CUtils.deleteFile(Qt.resolvedUrl(root.props.recordingConfirmDelete));
+                            CUtils.deleteFile("file://" + Paths.toLocalFile(root.props.recordingConfirmDelete));
                             root.props.recordingConfirmDelete = "";
                         }
                     }
