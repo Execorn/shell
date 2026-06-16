@@ -19,14 +19,36 @@ Singleton {
 
     readonly property string imagecache: `${cache}/imagecache`
     readonly property string notifimagecache: `${imagecache}/notifs`
-    readonly property string wallsdir: Quickshell.env("CAELESTIA_WALLPAPERS_DIR") || absolutePath(GlobalConfig.paths.wallpaperDir)
-    readonly property string recsdir: Quickshell.env("CAELESTIA_RECORDINGS_DIR") || absolutePath(GlobalConfig.paths.recordingDir)
+    readonly property string wallsdir: {
+        const envVal = Quickshell.env("CAELESTIA_WALLPAPERS_DIR");
+        if (envVal && envVal.trim() !== "") return envVal;
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.wallpaperDir;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : pictures + "/Wallpapers";
+    }
+    readonly property string recsdir: {
+        const envVal = Quickshell.env("CAELESTIA_RECORDINGS_DIR");
+        if (envVal && envVal.trim() !== "") return envVal;
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.recordingDir;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : videos + "/Recordings";
+    }
     readonly property string libdir: Quickshell.env("CAELESTIA_LIB_DIR") || "/usr/lib/caelestia"
 
-    readonly property string screenshotHelper: absolutePath(GlobalConfig.paths.screenshotHelper)
-    readonly property string screenshotDir: absolutePath(GlobalConfig.paths.screenshotDir)
-    readonly property string cheatsheetParser: (GlobalConfig.paths && GlobalConfig.paths.cheatsheetParser) ? absolutePath(GlobalConfig.paths.cheatsheetParser) : "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
-    readonly property string eqControlScript: absolutePath(GlobalConfig.paths.eqControlScript)
+    readonly property string screenshotHelper: {
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.screenshotHelper;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : "/home/execorn/scripts/screenshot_helper.sh";
+    }
+    readonly property string screenshotDir: {
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.screenshotDir;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : pictures + "/Screenshots";
+    }
+    readonly property string cheatsheetParser: {
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.cheatsheetParser;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py";
+    }
+    readonly property string eqControlScript: {
+        const configVal = GlobalConfig.paths && GlobalConfig.paths.eqControlScript;
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : "/home/execorn/scripts/eq-control.py";
+    }
 
     function toLocalFile(path: url): string {
         path = Qt.resolvedUrl(path);
@@ -48,6 +70,7 @@ Singleton {
     }
 
     function absolutePath(path: string): string {
+        if (!path || path.trim() === "") return "";
         return toLocalFile(path.replace(/~|(\$({?)HOME(}?))+/, home));
     }
 

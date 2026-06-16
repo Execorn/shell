@@ -32,7 +32,25 @@ StyledRect {
         x = 0;
         modelData.lock(this);
     }
-    Component.onDestruction: modelData.unlock(this)
+    Component.onDestruction: {
+        modelData.unlock(root);
+        const win = QsWindow.window;
+        if (win && typeof win.notificationHovered !== "undefined") {
+            win.notificationHovered = false;
+        }
+    }
+
+    focus: true
+    Keys.onPressed: event => {
+        if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_C) {
+            if (root.hasImage) {
+                Quickshell.execDetached(["sh", "-c", "wl-copy -t image/png < " + root.modelData.image]);
+            } else {
+                Quickshell.clipboardText = root.modelData.body;
+            }
+            event.accepted = true;
+        }
+    }
 
     Behavior on x {
         Anim {
@@ -49,10 +67,21 @@ StyledRect {
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         preventStealing: true
 
-        onEntered: root.modelData.timer.stop()
+        onEntered: {
+            root.modelData.timer.stop();
+            const win = QsWindow.window;
+            if (win && typeof win.notificationHovered !== "undefined") {
+                win.notificationHovered = true;
+            }
+            root.forceActiveFocus();
+        }
         onExited: {
             if (!pressed)
                 root.modelData.timer.start();
+            const win = QsWindow.window;
+            if (win && typeof win.notificationHovered !== "undefined") {
+                win.notificationHovered = false;
+            }
         }
 
         drag.target: parent
@@ -131,6 +160,19 @@ StyledRect {
                         }
                         cache: false
                         asynchronous: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            const actions = root.modelData.actions;
+                            const editAction = actions.find(a => a.identifier === "default" || a.text.toLowerCase().includes("edit")) || actions[0];
+                            if (editAction) {
+                                editAction.invoke();
+                            }
+                            root.modelData.popup = false;
+                        }
                     }
                 }
             }

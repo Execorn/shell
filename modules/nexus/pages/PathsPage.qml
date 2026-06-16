@@ -29,7 +29,8 @@ PageBase {
             first: true
             label: qsTr("Screenshot Helper Script")
             subtext: qsTr("Path to bash script handling screenshots")
-            value: GlobalConfig.paths.screenshotHelper
+            value: (GlobalConfig.paths && GlobalConfig.paths.screenshotHelper) || ""
+            placeholderText: "/home/execorn/scripts/screenshot_helper.sh"
             showBrowse: true
             onAccepted: text => GlobalConfig.paths.screenshotHelper = text
         }
@@ -39,7 +40,8 @@ PageBase {
             last: true
             label: qsTr("Screenshot Storage Directory")
             subtext: qsTr("Folder where captured images are saved")
-            value: GlobalConfig.paths.screenshotDir
+            value: (GlobalConfig.paths && GlobalConfig.paths.screenshotDir) || ""
+            placeholderText: "~/Pictures/Screenshots"
             showBrowse: true
             selectFolder: true
             onAccepted: text => GlobalConfig.paths.screenshotDir = text
@@ -55,7 +57,8 @@ PageBase {
             first: true
             label: qsTr("Equalizer Script")
             subtext: qsTr("Path to python equalizer control script")
-            value: GlobalConfig.paths.eqControlScript
+            value: (GlobalConfig.paths && GlobalConfig.paths.eqControlScript) || ""
+            placeholderText: "/home/execorn/scripts/eq-control.py"
             showBrowse: true
             onAccepted: text => GlobalConfig.paths.eqControlScript = text
         }
@@ -64,7 +67,8 @@ PageBase {
             Layout.fillWidth: true
             label: qsTr("Equalizer Presets Directory")
             subtext: qsTr("Folder where parametric EQ presets are stored")
-            value: GlobalConfig.paths.eqPresetsDir
+            value: (GlobalConfig.paths && GlobalConfig.paths.eqPresetsDir) || ""
+            placeholderText: "~/.config/pipewire/eq-presets"
             showBrowse: true
             selectFolder: true
             onAccepted: text => GlobalConfig.paths.eqPresetsDir = text
@@ -75,7 +79,8 @@ PageBase {
             last: true
             label: qsTr("Screen Recordings Directory")
             subtext: qsTr("Folder where video recordings are stored")
-            value: GlobalConfig.paths.recordingDir
+            value: (GlobalConfig.paths && GlobalConfig.paths.recordingDir) || ""
+            placeholderText: "~/Videos/Recordings"
             showBrowse: true
             selectFolder: true
             onAccepted: text => GlobalConfig.paths.recordingDir = text
@@ -92,7 +97,8 @@ PageBase {
             last: true
             label: qsTr("Keybinds Parser Script")
             subtext: qsTr("Python script parsing active window manager shortcuts")
-            value: GlobalConfig.paths.cheatsheetParser
+            value: (GlobalConfig.paths && GlobalConfig.paths.cheatsheetParser) || ""
+            placeholderText: "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
             showBrowse: true
             onAccepted: text => GlobalConfig.paths.cheatsheetParser = text
         }

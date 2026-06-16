@@ -77,7 +77,7 @@ MouseArea {
     }
 
     function save(): void {
-        const tmpfile = "file://" + Paths.toLocalFile(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
+        const tmpfile = "file:///tmp/caelestia-picker-" + Quickshell.processId + "-" + Date.now() + ".png";
         CUtils.saveItem(screencopy, tmpfile, Qt.rect(Math.ceil(rsx), Math.ceil(rsy), Math.floor(sw), Math.floor(sh)), path => {
             const helper = Paths.screenshotHelper;
             const dir = Paths.screenshotDir;
@@ -214,7 +214,8 @@ MouseArea {
         anchors.fill: parent
 
         active: root.loader.freeze
-        visible: root.loader.freeze
+        visible: true
+        opacity: root.loader.freeze ? 1 : 0
 
         sourceComponent: ScreencopyView {
             captureSource: root.screen

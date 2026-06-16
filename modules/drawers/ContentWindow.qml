@@ -62,6 +62,8 @@ StyledWindow {
                                          || visibilities.cheatsheet
                                          || visibilities.sidebar
 
+    property bool notificationHovered: false
+
     onHasFullscreenChanged: {
         visibilities.launcher = false;
         visibilities.session = false;
@@ -75,7 +77,7 @@ StyledWindow {
     WlrLayershell.layer: (fsTransitionProg > 0 && (contentItem.Config.general.showOverFullscreen || panels.osd.offsetScale < 1 || anyDrawerActive))
                       || (hasSpecialWorkspace && hasFullscreenOnNormalWs)
                       ? WlrLayer.Overlay : WlrLayer.Top
-    WlrLayershell.keyboardFocus: visibilities.launcher || visibilities.session || visibilities.dashboard || visibilities.cheatsheet ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: visibilities.launcher || visibilities.session || visibilities.dashboard || visibilities.cheatsheet || notificationHovered ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: (hasFullscreen && !anyDrawerActive) ? emptyRegion : regions
 

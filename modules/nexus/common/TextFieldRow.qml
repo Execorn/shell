@@ -21,7 +21,7 @@ ConnectedRect {
 
     readonly property bool isValid: {
         const text = input.text.trim();
-        if (!text) return false;
+        if (!text) return true;
         if (typeof CUtils === "undefined" || CUtils === null) return true;
         const absPath = Paths.absolutePath(text);
         if (selectFolder) {
@@ -94,35 +94,41 @@ ConnectedRect {
         anchors.rightMargin: Tokens.padding.largeIncreased
         spacing: Tokens.spacing.medium
 
-        MouseArea {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: input.left
-            anchors.rightMargin: Tokens.spacing.medium
-            cursorShape: Qt.IBeamCursor
-            onClicked: input.forceActiveFocus()
-        }
+        Item {
+            id: labelWrapper
 
-        ColumnLayout {
             Layout.fillWidth: true
-            spacing: 0
+            implicitHeight: colLayout.implicitHeight
+            Layout.alignment: Qt.AlignVCenter
 
-            StyledText {
-                id: label
-
-                Layout.fillWidth: true
-                font: Tokens.font.body.small
-                elide: Text.ElideRight
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.IBeamCursor
+                onClicked: input.forceActiveFocus()
             }
 
-            StyledText {
-                Layout.fillWidth: true
-                visible: root.subtext || root.showError
-                text: root.showError ? (root.selectFolder ? qsTr("Directory does not exist or is invalid") : qsTr("File does not exist or is invalid")) : root.subtext
-                color: root.showError ? Colours.palette.m3error : Colours.palette.m3outline
-                font: Tokens.font.label.small
-                elide: Text.ElideRight
+            ColumnLayout {
+                id: colLayout
+
+                anchors.fill: parent
+                spacing: 0
+
+                StyledText {
+                    id: label
+
+                    Layout.fillWidth: true
+                    font: Tokens.font.body.small
+                    elide: Text.ElideRight
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: root.subtext || root.showError
+                    text: root.showError ? (root.selectFolder ? qsTr("Directory does not exist or is invalid") : qsTr("File does not exist or is invalid")) : root.subtext
+                    color: root.showError ? Colours.palette.m3error : Colours.palette.m3outline
+                    font: Tokens.font.label.small
+                    elide: Text.ElideRight
+                }
             }
         }
 
