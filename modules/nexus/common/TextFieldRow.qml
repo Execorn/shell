@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Caelestia
 import Caelestia.Config
 import qs.components
 import qs.components.controls
@@ -12,11 +13,25 @@ ConnectedRect {
 
     property alias label: label.text
     property string subtext
-    property alias value: input.text
+    property string value
     property alias placeholderText: input.placeholderText
     property bool showBrowse: false
     property bool selectFolder: false
     signal accepted(string text)
+
+    readonly property bool isValid: {
+        const text = input.text.trim();
+        if (!text) return false;
+        if (typeof CUtils === "undefined" || CUtils === null) return true;
+        const absPath = Paths.absolutePath(text);
+        if (selectFolder) {
+            return CUtils.dirExists(absPath);
+        } else {
+            return CUtils.fileExists(absPath);
+        }
+    }
+
+    readonly property bool showError: !isValid && !input.activeFocus
 
     function parsePathToCwd(path, selectFolder) {
         if (!path) return ["Home"];
@@ -60,23 +75,12 @@ ConnectedRect {
     Layout.fillWidth: true
     implicitHeight: rowLayout.implicitHeight + rowLayout.anchors.margins * 2
 
-    MouseArea {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: input.left
-        anchors.rightMargin: Tokens.spacing.medium
-        cursorShape: Qt.IBeamCursor
-        onClicked: input.forceActiveFocus()
-    }
-
     FileDialog {
         id: fileDialog
         title: selectFolder ? qsTr("Select Directory") : qsTr("Select File")
         selectFolder: root.selectFolder
         onAccepted: path => {
             const localPath = Paths.shortenHome(path);
-            root.value = localPath;
             root.accepted(localPath);
         }
     }
@@ -89,6 +93,16 @@ ConnectedRect {
         anchors.leftMargin: Tokens.padding.largeIncreased
         anchors.rightMargin: Tokens.padding.largeIncreased
         spacing: Tokens.spacing.medium
+
+        MouseArea {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: input.left
+            anchors.rightMargin: Tokens.spacing.medium
+            cursorShape: Qt.IBeamCursor
+            onClicked: input.forceActiveFocus()
+        }
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -104,9 +118,9 @@ ConnectedRect {
 
             StyledText {
                 Layout.fillWidth: true
-                visible: root.subtext
-                text: root.subtext
-                color: Colours.palette.m3outline
+                visible: root.subtext || root.showError
+                text: root.showError ? (root.selectFolder ? qsTr("Directory does not exist or is invalid") : qsTr("File does not exist or is invalid")) : root.subtext
+                color: root.showError ? Colours.palette.m3error : Colours.palette.m3outline
                 font: Tokens.font.label.small
                 elide: Text.ElideRight
             }
@@ -117,7 +131,15 @@ ConnectedRect {
 
             Layout.preferredWidth: 320
             font: Tokens.font.body.small
+            color: root.showError ? Colours.palette.m3error : Colours.palette.m3onSurface
             onEditingFinished: root.accepted(text)
+
+            Binding {
+                target: input
+                property: "text"
+                value: root.value
+                when: !input.activeFocus
+            }
         }
 
         IconButton {
