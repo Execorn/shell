@@ -319,7 +319,20 @@ Singleton {
         root.physicalSinks = newPhysicalSinks;
         root.physicalSources = newPhysicalSources;
 
-        tracker.objects = trackerObjects;
+        let objectsChanged = false;
+        if (!tracker.objects || tracker.objects.length !== trackerObjects.length) {
+            objectsChanged = true;
+        } else {
+            for (let i = 0; i < trackerObjects.length; i++) {
+                if (tracker.objects[i] !== trackerObjects[i]) {
+                    objectsChanged = true;
+                    break;
+                }
+            }
+        }
+        if (objectsChanged) {
+            tracker.objects = trackerObjects;
+        }
 
         Qt.callLater(root.updateActiveSink);
     }

@@ -26,6 +26,7 @@ ShellRoot {
     property var ocr: Ocr
     property var players: Players
     property var notifs: Notifs
+    property var gameMode: GameMode
 
     settings.watchFiles: false
 
