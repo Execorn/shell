@@ -12,7 +12,29 @@ Singleton {
 
     property alias enabled: props.enabled
 
+    property var originalOptions: null
+
     function setDynamicConfs(): void {
+        const optionsToSave = [
+            "animations:enabled",
+            "decoration:shadow:enabled",
+            "decoration:blur:enabled",
+            "general:gaps_in",
+            "general:gaps_out",
+            "general:border_size",
+            "decoration:rounding",
+            "general:allow_tearing"
+        ];
+        const saved = {};
+        for (let i = 0; i < optionsToSave.length; i++) {
+            const opt = optionsToSave[i];
+            const val = Hypr.options[opt];
+            if (val !== undefined) {
+                saved[opt] = val;
+            }
+        }
+        originalOptions = saved;
+
         Hypr.extras.applyOptions({
             "animations:enabled": 0,
             "decoration:shadow:enabled": 0,
@@ -25,13 +47,22 @@ Singleton {
         });
     }
 
+    function restoreConfs(): void {
+        if (originalOptions && Object.keys(originalOptions).length > 0) {
+            Hypr.extras.applyOptions(originalOptions);
+        } else {
+            Hypr.extras.message("reload");
+        }
+    }
+
     onEnabledChanged: {
         if (enabled) {
             setDynamicConfs();
+            Quickshell.execDetached(["/home/execorn/scripts/disable_monitors.sh"]);
             if (GlobalConfig.utilities.toasts.gameModeChanged)
                 Toaster.toast(qsTr("Game mode enabled"), qsTr("Disabled Hyprland animations, blur, gaps and shadows"), "gamepad");
         } else {
-            Hypr.extras.message("reload");
+            restoreConfs();
             if (GlobalConfig.utilities.toasts.gameModeChanged)
                 Toaster.toast(qsTr("Game mode disabled"), qsTr("Hyprland settings restored"), "gamepad");
         }

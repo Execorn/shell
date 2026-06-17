@@ -29,6 +29,20 @@ Searcher {
                 "command": ["autocomplete", "eq"],
                 "enabled": true
             });
+            list.push({
+                "name": qsTr("Monitors"),
+                "description": qsTr("Enable or disable external monitors for gaming"),
+                "icon": "desktop_windows",
+                "command": ["autocomplete", "monitors"],
+                "enabled": true
+            });
+            list.push({
+                "name": qsTr("Game Mode"),
+                "description": qsTr("Enable or disable maximum performance mode"),
+                "icon": "gamepad",
+                "command": ["autocomplete", "gamemode"],
+                "enabled": true
+            });
             return list;
         }
 

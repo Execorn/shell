@@ -125,9 +125,9 @@ void HyprExtras::refreshOptions() {
 
         for (const auto& o : std::as_const(options)) {
             const auto obj = o.toObject();
-            const auto key = obj.value("value").toString();
-            const auto value = obj.value("data").toObject().value("current").toVariant();
-            if (m_options.value(key) != value) {
+            const auto key = obj.value("name").toString();
+            const auto value = obj.value("current").toVariant();
+            if (!key.isEmpty() && m_options.value(key) != value) {
                 dirty = true;
                 m_options.insert(key, value);
             }
@@ -202,12 +202,19 @@ HyprExtras::SocketPtr HyprExtras::makeRequest(
     }
 
     auto socket = SocketPtr::create(this);
+    auto response = QSharedPointer<QByteArray>::create();
+    auto executed = QSharedPointer<bool>::create(false);
 
     QObject::connect(socket.data(), &QLocalSocket::connected, this, [=, this]() {
-        QObject::connect(socket.data(), &QLocalSocket::readyRead, this, [socket, callback]() {
-            const auto response = socket->readAll();
-            callback(true, std::move(response));
-            socket->close();
+        QObject::connect(socket.data(), &QLocalSocket::readyRead, this, [socket, response]() {
+            response->append(socket->readAll());
+        });
+
+        QObject::connect(socket.data(), &QLocalSocket::disconnected, this, [socket, response, callback, executed]() {
+            if (!*executed) {
+                *executed = true;
+                callback(true, *response);
+            }
         });
 
         socket->write(request.toUtf8());
@@ -215,8 +222,18 @@ HyprExtras::SocketPtr HyprExtras::makeRequest(
     });
 
     QObject::connect(socket.data(), &QLocalSocket::errorOccurred, this, [=](QLocalSocket::LocalSocketError err) {
-        qCWarning(lcHypr) << "makeRequest: error making request:" << err << "| request:" << request;
-        callback(false, {});
+        if (err == QLocalSocket::PeerClosedError) {
+            if (!*executed) {
+                *executed = true;
+                callback(true, *response);
+            }
+        } else {
+            if (!*executed) {
+                *executed = true;
+                qCWarning(lcHypr) << "makeRequest: error making request:" << err << "| request:" << request;
+                callback(false, {});
+            }
+        }
         socket->close();
     });
 

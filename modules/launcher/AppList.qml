@@ -238,7 +238,7 @@ StyledListView {
         const text = search.text;
         const prefix = GlobalConfig.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
-            for (const action of ["calc", "scheme", "variant", "eq"])
+            for (const action of ["calc", "scheme", "variant", "eq", "monitors", "gamemode"])
                 if (text.startsWith(`${prefix}${action} `) || text === `${prefix}${action}`)
                     return action;
 
@@ -301,6 +301,22 @@ StyledListView {
 
             PropertyChanges {
                 model.values: (EQs.presetsList, EQs.query(search.text))
+                root.delegate: actionItem
+            }
+        },
+        State {
+            name: "monitors"
+
+            PropertyChanges {
+                model.values: Monitors.query(search.text)
+                root.delegate: actionItem
+            }
+        },
+        State {
+            name: "gamemode"
+
+            PropertyChanges {
+                model.values: GameModeLauncher.query(search.text)
                 root.delegate: actionItem
             }
         }
