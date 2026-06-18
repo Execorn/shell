@@ -41,7 +41,7 @@ Singleton {
 
     function setVolume(newVolume: real): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
-        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
+        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink";
         const targetId = (isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (isNodeValid(sink) ? sink.id : -1);
 
         if (targetId !== -1) {
@@ -115,8 +115,10 @@ Singleton {
             const s = physicalSinks[i];
             if (isNodeValid(s) && s.name && (s.name.indexOf("alsa_output.usb") === 0 || s.name.indexOf("usb-") !== -1)) {
                 const nameLower = s.name.toLowerCase();
+                const descLower = (s.description || "").toLowerCase();
                 const isMic = nameLower.indexOf("micro") !== -1 || nameLower.indexOf("mic") !== -1 || nameLower.indexOf("input") !== -1;
-                if (!isMic) {
+                const isLoopback = nameLower.indexOf("loopback") !== -1 || descLower.indexOf("loopback") !== -1;
+                if (!isMic && !isLoopback) {
                     return s.name;
                 }
             }
@@ -154,7 +156,7 @@ Singleton {
         let resolvedSink = null;
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         if (isNodeValid(dSink)) {
-            if (dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink")) {
+            if (dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink") {
                 const driverId = root.physicalDriverId;
                 if (driverId !== -1) {
                     const physicalSink = sinks.find(n => isNodeValid(n) && n.id === driverId);
@@ -202,7 +204,7 @@ Singleton {
 
     function setStreamMuted(stream: var, muted: bool): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
-        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink");
+        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink";
         const targetId = (stream === root.sink && isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (stream === root.sink && isNodeValid(root.sink) ? root.sink.id : -1);
 
         if (targetId !== -1) {
@@ -286,7 +288,7 @@ Singleton {
                 node.readyChanged.connect(root.syncNodes);
             } catch (e) {}
             if (!node.isStream) {
-                const isVirtual = (node.properties && node.properties["node.virtual"] === "true") || node.name === "easyeffects_sink" || node.name === "easyeffects_source";
+                const isVirtual = (node.properties && node.properties["node.virtual"] === "true") || node.name === "easyeffects_sink" || node.name === "easyeffects_source" || node.name === "riced_equalizer_sink" || node.name === "riced_microphone_source";
 
                 if (node.isSink) {
                     trackerObjects.push(node);
