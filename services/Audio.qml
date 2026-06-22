@@ -82,9 +82,39 @@ Singleton {
         setSourceVolume(sourceVolume - (amount || GlobalConfig.services.audioIncrement));
     }
 
+    property string preferredPhysicalSink: ""
+    property string lastRoutedPhysicalSink: ""
+
+    readonly property Process eqRouteProc: Process {}
+
+    readonly property int activePhysicalSinkId: {
+        if (!isNodeValid(sink)) return -1;
+        if (sink.name === "riced_equalizer_sink") {
+            const node = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
+            return node ? node.id : -1;
+        }
+        return sink.id;
+    }
+
+    function routeEqualizerTo(sinkName: string): void {
+        eqRouteProc.running = false;
+        eqRouteProc.command = [
+            "bash", "-c",
+            `id=$(pactl list sink-inputs | grep -B 20 "Riced Equalizer Sink" | grep "Sink Input #" | cut -d'#' -f2 | tr -d ' '); if [ ! -z "$id" ]; then pactl move-sink-input "$id" "${sinkName}"; fi`
+        ];
+        eqRouteProc.running = true;
+    }
+
     function setAudioSink(newSink: var): void {
         if (Pipewire) {
-            Pipewire.preferredDefaultAudioSink = newSink;
+            const isEQ = isNodeValid(sink) && sink.name === "riced_equalizer_sink";
+            if (isEQ) {
+                preferredPhysicalSink = newSink.name;
+                Qt.callLater(root.updateActiveSink);
+            } else {
+                Pipewire.preferredDefaultAudioSink = newSink;
+                preferredPhysicalSink = newSink.name;
+            }
         }
     }
 
@@ -156,6 +186,19 @@ Singleton {
         let resolvedSink = null;
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         if (isNodeValid(dSink)) {
+            const isEQ = dSink.name === "riced_equalizer_sink";
+            if (isEQ) {
+                if (preferredPhysicalSink === "") {
+                    preferredPhysicalSink = getBestOutputSinkName();
+                }
+                if (preferredPhysicalSink !== "" && preferredPhysicalSink !== lastRoutedPhysicalSink) {
+                    routeEqualizerTo(preferredPhysicalSink);
+                    lastRoutedPhysicalSink = preferredPhysicalSink;
+                }
+            } else {
+                lastRoutedPhysicalSink = "";
+            }
+
             if (dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink") {
                 const driverId = root.physicalDriverId;
                 if (driverId !== -1) {

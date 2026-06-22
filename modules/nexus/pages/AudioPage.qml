@@ -40,7 +40,7 @@ PageBase {
 
         AudioDeviceList {
             nodes: Audio.physicalSinks
-            currentId: Audio.sink?.id ?? -1
+            currentId: Audio.activePhysicalSinkId
             iconName: "speaker"
             placeholderIcon: "speaker"
             placeholderText: qsTr("No output devices")
