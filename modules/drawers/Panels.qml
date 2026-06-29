@@ -13,6 +13,8 @@ import qs.modules.utilities as Utilities
 import qs.modules.bar.popouts as BarPopouts
 import qs.modules.utilities.toasts as Toasts
 import qs.modules.cheatsheet as Cheatsheet
+import "../newsfeed" as Newsfeed
+
 
 Item {
     id: root
@@ -28,6 +30,7 @@ Item {
     readonly property alias session: session
     readonly property alias sessionWrapper: sessionWrapper
     readonly property alias launcher: launcher
+    readonly property alias newsfeed: newsfeed
     readonly property alias dashboard: dashboard
     readonly property alias popouts: popoutsWrapper.content
     readonly property alias popoutsWrapper: popoutsWrapper
@@ -100,6 +103,17 @@ Item {
 
     Launcher.Wrapper {
         id: launcher
+
+        screen: root.screen
+        visibilities: root.visibilities
+        panels: root
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+    }
+
+    Newsfeed.Wrapper {
+        id: newsfeed
 
         screen: root.screen
         visibilities: root.visibilities

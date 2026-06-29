@@ -61,6 +61,7 @@ StyledWindow {
                                          || visibilities.dashboard
                                          || visibilities.cheatsheet
                                          || visibilities.sidebar
+                                         || visibilities.newsfeed
 
     property bool notificationHovered: false
 
@@ -69,6 +70,7 @@ StyledWindow {
         visibilities.session = false;
         visibilities.dashboard = false;
         visibilities.cheatsheet = false;
+        visibilities.newsfeed = false;
         panels.popouts.close();
     }
 
@@ -128,6 +130,7 @@ StyledWindow {
              || (visibilities.dashboard && visibilities.dashboardFocused && root.contentItem.Config.dashboard.enabled)
              || (panels.popouts.currentName.startsWith("traymenu") && (panels.popouts.current as StackView)?.depth > 1)
              || visibilities.cheatsheet
+             || visibilities.newsfeed
         windows: [root]
         onCleared: {
             visibilities.launcher = false;
@@ -135,6 +138,7 @@ StyledWindow {
             visibilities.sidebar = false;
             visibilities.dashboard = false;
             visibilities.cheatsheet = false;
+            visibilities.newsfeed = false;
             panels.popouts.hasCurrent = false;
             bar.closeTray();
         }
@@ -191,6 +195,13 @@ StyledWindow {
             id: launcherBg
 
             panel: panels.launcher
+            deformAmount: 0.1
+        }
+
+        PanelBg {
+            id: newsfeedBg
+
+            panel: panels.newsfeed
             deformAmount: 0.1
         }
 
@@ -301,6 +312,9 @@ StyledWindow {
             }
             launcher.transform: Matrix4x4 {
                 matrix: launcherBg.deformMatrix
+            }
+            newsfeed.transform: Matrix4x4 {
+                matrix: newsfeedBg.deformMatrix
             }
             cheatsheet.transform: Matrix4x4 {
                 matrix: cheatsheetBg.deformMatrix
