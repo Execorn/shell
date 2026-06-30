@@ -109,7 +109,6 @@ Dependencies:
 -   [`quickshell-git`](https://quickshell.outfoxxed.me) - this has to be the git version, not the latest tagged version
 -   [`ddcutil`](https://github.com/rockowitz/ddcutil)
 -   [`brightnessctl`](https://github.com/Hummer12007/brightnessctl)
--   [`app2unit`](https://github.com/Vladimir-csp/app2unit)
 -   [`libcava`](https://github.com/LukashonakV/cava)
 -   [`networkmanager`](https://networkmanager.dev)
 -   [`lm-sensors`](https://github.com/lm-sensors/lm-sensors)
@@ -374,10 +373,14 @@ For example, to disable the bar on DP-1:
         "idle": {
             "lockBeforeSleep": true,
             "inhibitWhenAudio": true,
+            "inhibitWhenCharging": false,
             "timeouts": [
                 {
                     "timeout": 180,
-                    "idleAction": "lock"
+                    "idleAction": "lock",
+                    "inhibitWhenAudio": false,
+                    "inhibitWhenCharging": false,
+                    "respectInhibitors": true
                 },
                 {
                     "timeout": 300,
@@ -386,7 +389,7 @@ For example, to disable the bar on DP-1:
                 },
                 {
                     "timeout": 600,
-                    "idleAction": ["systemctl", "suspend-then-hibernate"]
+                    "idleAction": ["suspendThenHibernate"]
                 }
             ]
         },
@@ -653,7 +656,7 @@ For example, to disable the bar on DP-1:
                 "name": "Shutdown",
                 "icon": "power_settings_new",
                 "description": "Shutdown the system",
-                "command": ["systemctl", "poweroff"],
+                "command": ["poweroff"],
                 "enabled": true,
                 "dangerous": true
             },
@@ -661,7 +664,7 @@ For example, to disable the bar on DP-1:
                 "name": "Reboot",
                 "icon": "cached",
                 "description": "Reboot the system",
-                "command": ["systemctl", "reboot"],
+                "command": ["reboot"],
                 "enabled": true,
                 "dangerous": true
             },
@@ -669,7 +672,7 @@ For example, to disable the bar on DP-1:
                 "name": "Logout",
                 "icon": "exit_to_app",
                 "description": "Log out of the current session",
-                "command": ["loginctl", "terminate-user", ""],
+                "command": ["logout"],
                 "enabled": true,
                 "dangerous": true
             },
@@ -685,7 +688,7 @@ For example, to disable the bar on DP-1:
                 "name": "Sleep",
                 "icon": "bedtime",
                 "description": "Suspend then hibernate",
-                "command": ["systemctl", "suspend-then-hibernate"],
+                "command": ["suspendThenHibernate"],
                 "enabled": true,
                 "dangerous": false
             },
@@ -700,6 +703,7 @@ For example, to disable the bar on DP-1:
         ]
     },
     "lock": {
+        "enabled": true,
         "recolourLogo": true,
         "enableFprint": true,
         "maxFprintTries": 3,
@@ -752,14 +756,16 @@ For example, to disable the bar on DP-1:
             "reboot": "cached"
         },
         "commands": {
-            "logout": ["loginctl", "terminate-user", ""],
-            "shutdown": ["systemctl", "poweroff"],
-            "hibernate": ["systemctl", "hibernate"],
-            "reboot": ["systemctl", "reboot"]
+            "logout": ["logout"],
+            "shutdown": ["poweroff"],
+            "hibernate": ["hibernate"],
+            "reboot": ["reboot"]
         }
     },
     "sidebar": {
         "enabled": true,
+        "showOnHover": false,
+        "minHoverThreshold": 200,
         "dragThreshold": 80
     },
     "utilities": {

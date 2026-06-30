@@ -320,7 +320,6 @@ PageBase {
         }
 
         SelectRow {
-            Layout.fillWidth: true
             first: true
             label: qsTr("Temperature")
             subtext: qsTr("Units for weather temperatures")
@@ -330,7 +329,6 @@ PageBase {
         }
 
         SelectRow {
-            Layout.fillWidth: true
             last: true
             label: qsTr("System temperatures")
             subtext: qsTr("Units for CPU and GPU temperatures")
@@ -345,7 +343,6 @@ PageBase {
         }
 
         SelectRow {
-            Layout.fillWidth: true
             first: true
             last: true
             label: qsTr("Clock format")

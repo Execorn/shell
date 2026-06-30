@@ -149,6 +149,48 @@ Slider {
         }
     }
 
+    Binding {
+        id: posBinding
+
+        target: root
+        property: "pos"
+        value: CUtils.clamp(mouse.pressStartPos + mouse.dragMovement, 0, 1)
+        when: mouse.pressed
+    }
+
+    MouseArea {
+        id: mouse
+
+        property real pressStartX
+        property real pressStartPos
+        property real dragMovement
+
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+
+        preventStealing: true
+        implicitHeight: handle.implicitHeight
+
+        onPressed: e => {
+            widthBehavior.enabled = false;
+            pressStartX = e.x;
+            pressStartPos = root.visualPosition;
+        }
+        onPositionChanged: e => {
+            dragMovement = (e.x - pressStartX) / width;
+            if (root.interactionOnMove)
+                root.interaction(posBinding.value);
+        }
+        onReleased: e => {
+            const clickPos = e.x / width;
+            const finalPos = mouse.dragMovement !== 0 ? posBinding.value : CUtils.clamp(clickPos, 0, 1);
+            root.interaction(finalPos);
+            widthBehavior.enabled = true;
+            dragMovement = 0;
+        }
+    }
+
     Behavior on filledWidth {
         id: widthBehavior
 
