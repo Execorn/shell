@@ -65,7 +65,7 @@ Item {
                 required property PwNode modelData
 
                 ButtonGroup.group: sources
-                checked: Audio.source && modelData ? Audio.source.id === modelData.id : false
+                checked: modelData ? Audio.activePhysicalSourceId === modelData.id : false
                 onClicked: if (modelData) Audio.setAudioSource(modelData)
                 text: modelData ? modelData.description : ""
             }

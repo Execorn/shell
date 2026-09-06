@@ -65,7 +65,7 @@ PageBase {
 
         AudioDeviceList {
             nodes: Audio.physicalSources
-            currentId: Audio.source?.id ?? -1
+            currentId: Audio.activePhysicalSourceId
             iconName: "mic"
             placeholderIcon: "mic_off"
             placeholderText: qsTr("No input devices")

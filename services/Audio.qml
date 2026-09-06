@@ -156,10 +156,85 @@ except Exception as e:
         }
     }
 
-    function setAudioSource(newSource: var): void {
-        if (Pipewire) {
-            Pipewire.preferredDefaultAudioSource = newSource;
+    property string preferredPhysicalSource: ""
+    property string lastRoutedPhysicalSource: ""
+    property bool manualSourceOverride: false
+    property var knownPhysicalSourceNames: []
+    property string previousPhysicalSourceDesc: ""
+
+    readonly property string activePhysicalSourceDesc: {
+        const node = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
+        if (node) return node.description || node.name || "";
+        if (isNodeValid(source)) return source.description || source.name || "";
+        return "";
+    }
+
+    onActivePhysicalSourceDescChanged: {
+        if (!activePhysicalSourceDesc) return;
+        if (previousPhysicalSourceDesc && previousPhysicalSourceDesc !== activePhysicalSourceDesc && GlobalConfig.utilities.toasts.audioInputChanged) {
+            Toaster.toast(qsTr("Audio input changed"), qsTr("Now using: %1").arg(activePhysicalSourceDesc), "mic");
         }
+        previousPhysicalSourceDesc = activePhysicalSourceDesc;
+    }
+
+    readonly property Process micRouteProc: Process {}
+
+    readonly property Process cardProfileFixProc: Process {
+        command: [
+            "python3", "-c",
+            `import subprocess
+try:
+    cards = subprocess.check_output(["pactl", "list", "cards"]).decode("utf-8", errors="replace")
+    for block in cards.split("Card #"):
+        if "alsa_card.pci" in block and "Active Profile: output:analog-stereo\\n" in block:
+            card_name = [l.split("Name: ")[1].strip() for l in block.splitlines() if "Name: " in l][0]
+            subprocess.run(["pactl", "set-card-profile", card_name, "output:analog-stereo+input:analog-stereo"], check=True)
+except Exception:
+    pass
+`
+        ]
+    }
+
+    readonly property int activePhysicalSourceId: {
+        const prefNode = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
+        if (prefNode) return prefNode.id;
+        if (isNodeValid(source) && physicalSources.indexOf(source) !== -1) return source.id;
+        return physicalSources.length > 0 ? physicalSources[0].id : -1;
+    }
+
+    function routeMicrophoneFrom(sourceName: string): void {
+        if (!sourceName) return;
+        micRouteProc.running = false;
+        micRouteProc.command = [
+            "python3", "-c",
+            `import subprocess, sys
+target = sys.argv[1]
+try:
+    out = subprocess.check_output(["pactl", "list", "source-outputs"]).decode("utf-8", errors="replace")
+    for block in out.split("Source Output #"):
+        if not block.strip(): continue
+        lines = block.splitlines()
+        sid = lines[0].strip()
+        if "input.filter-chain" in block or "Riced Microphone Source" in block:
+            subprocess.run(["pactl", "move-source-output", sid, target], check=True)
+except Exception:
+    pass
+
+try:
+    subprocess.run(["pactl", "set-default-source", target], check=True)
+except Exception:
+    pass
+`,
+            sourceName
+        ];
+        micRouteProc.running = true;
+    }
+
+    function setAudioSource(newSource: var): void {
+        if (!newSource || !newSource.name) return;
+        manualSourceOverride = true;
+        preferredPhysicalSource = newSource.name;
+        Qt.callLater(root.updateActiveSource);
     }
 
     property int physicalDriverId: -1
@@ -291,6 +366,72 @@ except Exception as e:
         const currentIndex = physicalSinks.findIndex(s => s.id === root.activePhysicalSinkId);
         const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % physicalSinks.length : 0;
         setAudioSink(physicalSinks[nextIndex]);
+    }
+
+    function getBestInputSourceName(): string {
+        if (physicalSources.length === 0) return "";
+        
+        // 1. Look for Bluetooth microphone
+        for (let i = 0; i < physicalSources.length; i++) {
+            const s = physicalSources[i];
+            if (isNodeValid(s) && s.name && (s.name.indexOf("bluez_input") !== -1 || s.name.indexOf("bluez_source") !== -1)) {
+                return s.name;
+            }
+        }
+        
+        // 2. Look for USB microphone / audio interface
+        for (let i = 0; i < physicalSources.length; i++) {
+            const s = physicalSources[i];
+            if (isNodeValid(s) && s.name && (s.name.indexOf("alsa_input.usb") === 0 || s.name.indexOf("usb-") !== -1)) {
+                return s.name;
+            }
+        }
+        
+        // 3. Fallback to laptop internal microphone
+        const internalSource = physicalSources.find(s => isNodeValid(s) && s.name && (s.name.indexOf("pci-") !== -1 || s.name.indexOf("analog-stereo") !== -1));
+        if (internalSource && internalSource.name) {
+            return internalSource.name;
+        }
+        
+        const firstSource = physicalSources.find(s => isNodeValid(s) && s.name);
+        return firstSource ? firstSource.name : "";
+    }
+
+    function updateActiveSource(): void {
+        const prefExists = physicalSources.some(s => isNodeValid(s) && s.name === preferredPhysicalSource);
+        if (!prefExists) {
+            root.manualSourceOverride = false;
+            preferredPhysicalSource = "";
+        }
+
+        if (!root.manualSourceOverride || preferredPhysicalSource === "") {
+            const bestName = getBestInputSourceName();
+            if (bestName !== "") {
+                preferredPhysicalSource = bestName;
+            }
+        }
+
+        const activeNode = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
+        console.log("[Audio.qml debug] updateActiveSource called. prefPhysicalSource:", preferredPhysicalSource, "override:", root.manualSourceOverride);
+
+        if (activeNode && preferredPhysicalSource !== "") {
+            if (preferredPhysicalSource !== lastRoutedPhysicalSource) {
+                routeMicrophoneFrom(preferredPhysicalSource);
+                lastRoutedPhysicalSource = preferredPhysicalSource;
+            }
+            if (Pipewire && Pipewire.preferredDefaultAudioSource !== activeNode) {
+                Pipewire.preferredDefaultAudioSource = activeNode;
+            }
+        }
+    }
+
+    function cycleNextAudioInput(): void {
+        if (physicalSources.length === 0)
+            return;
+
+        const currentIndex = physicalSources.findIndex(s => s.id === root.activePhysicalSourceId);
+        const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % physicalSources.length : 0;
+        setAudioSource(physicalSources[nextIndex]);
     }
 
     function setStreamVolume(stream: var, newVolume: real): void {
@@ -435,6 +576,25 @@ except Exception as e:
         }
         root.knownPhysicalSinkNames = currentPhysicalNames;
 
+        const currentPhysicalSourceNames = newPhysicalSources.map(s => s.name);
+        if (root.knownPhysicalSourceNames.length > 0) {
+            for (let i = 0; i < currentPhysicalSourceNames.length; i++) {
+                const name = currentPhysicalSourceNames[i];
+                if (root.knownPhysicalSourceNames.indexOf(name) === -1) {
+                    console.log("[Audio.qml] Newly connected physical source:", name);
+                    if (name.indexOf("bluez_input") !== -1 || name.indexOf("bluez_source") !== -1 || name.indexOf("usb") !== -1) {
+                        console.log("[Audio.qml] Auto-switching to newly connected priority input device:", name);
+                        root.manualSourceOverride = false;
+                    }
+                }
+            }
+        }
+        root.knownPhysicalSourceNames = currentPhysicalSourceNames;
+
+        if (newPhysicalSources.length === 0 && !cardProfileFixProc.running) {
+            cardProfileFixProc.running = true;
+        }
+
         let objectsChanged = false;
         if (!tracker.objects || tracker.objects.length !== trackerObjects.length) {
             objectsChanged = true;
@@ -451,12 +611,14 @@ except Exception as e:
         }
 
         Qt.callLater(root.updateActiveSink);
+        Qt.callLater(root.updateActiveSource);
     }
 
     Component.onCompleted: {
         previousSinkName = isNodeValid(sink) ? (sink.description || sink.name) : qsTr("Unknown Device");
         previousSourceName = isNodeValid(source) ? (source.description || source.name) : qsTr("Unknown Device");
         previousPhysicalSinkDesc = activePhysicalSinkDesc;
+        previousPhysicalSourceDesc = activePhysicalSourceDesc;
         root.syncNodes();
     }
 
@@ -497,6 +659,12 @@ except Exception as e:
         function onPreferredDefaultAudioSinkChanged(): void {
             Qt.callLater(root.updateActiveSink);
         }
+        function onDefaultAudioSourceChanged(): void {
+            Qt.callLater(root.updateActiveSource);
+        }
+        function onPreferredDefaultAudioSourceChanged(): void {
+            Qt.callLater(root.updateActiveSource);
+        }
         target: Pipewire || null
     }
 
@@ -517,6 +685,10 @@ except Exception as e:
     IpcHandler {
         function cycleOutput(): void {
             root.cycleNextAudioOutput();
+        }
+
+        function cycleInput(): void {
+            root.cycleNextAudioInput();
         }
 
         function updateVolume(volStr: string, mutStr: string): void {
