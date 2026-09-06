@@ -15,10 +15,14 @@ PageBase {
     id: root
 
     readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter // qmllint disable unresolved-type
+    property BluetoothDevice pairingDevice: null
+    property bool pairFailed: false
 
     function setScan(on: bool): void {
-        if (adapter?.enabled)
+        if (adapter?.enabled) {
+            adapter.pairable = on;
             adapter.discovering = on;
+        }
     }
 
     title: qsTr("Pair new device")
@@ -33,6 +37,48 @@ PageBase {
         anchors.top: parent.top
         width: root.cappedWidth
         spacing: Tokens.spacing.extraSmall / 2
+
+        Connections {
+            target: root.pairingDevice
+
+            function onPairedChanged(): void {
+                if (root.pairingDevice?.paired) {
+                    root.pairingDevice.trusted = true;
+                    root.pairingDevice.connect();
+                }
+            }
+
+            function onPairingChanged(): void {
+                if (root.pairingDevice && !root.pairingDevice.pairing && !root.pairingDevice.paired) {
+                    root.pairFailed = true;
+                    failTimer.restart();
+                }
+            }
+
+            function onConnectedChanged(): void {
+                if (root.pairingDevice?.connected) {
+                    closeTimer.restart();
+                }
+            }
+        }
+
+        Timer {
+            id: closeTimer
+            interval: 800
+            onTriggered: {
+                root.pairingDevice = null;
+                root.nState.closeSubPage();
+            }
+        }
+
+        Timer {
+            id: failTimer
+            interval: 3000
+            onTriggered: {
+                root.pairFailed = false;
+                root.pairingDevice = null;
+            }
+        }
 
         Connections {
             function onEnabledChanged(): void {
@@ -74,7 +120,7 @@ PageBase {
             list.anchors.top: scanIndicator.bottom
 
             model: ScriptModel {
-                values: Bluetooth.devices.values.filter(d => !d.bonded).sort((a, b) => (b.pairing - a.pairing) || a.name.localeCompare(b.name)) // qmllint disable unresolved-type
+                values: Bluetooth.devices.values.filter(d => !d.bonded || d === root.pairingDevice).sort((a, b) => (b.pairing - a.pairing) || a.name.localeCompare(b.name)) // qmllint disable unresolved-type
             }
 
             delegate: Item {
@@ -82,8 +128,13 @@ PageBase {
 
                 required property BluetoothDevice modelData
                 required property int index
-                property real textOpacity: modelData?.pairing ? 0.5 : 1
-                property bool wasPairing
+
+                readonly property bool isThisPairing: root.pairingDevice === modelData
+                readonly property bool isConnecting: modelData?.state === BluetoothDeviceState.Connecting // qmllint disable unresolved-type
+                readonly property bool isConnected: modelData?.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
+                readonly property bool isBusy: (modelData?.pairing ?? false) || isConnecting || (isThisPairing && isConnected)
+
+                property real textOpacity: isBusy ? 0.5 : 1
 
                 anchors.left: deviceList.list.contentItem.left
                 anchors.right: deviceList.list.contentItem.right
@@ -95,24 +146,19 @@ PageBase {
                     }
                 }
 
-                Connections {
-                    function onPairedChanged(): void {
-                        if (newDevice.wasPairing && newDevice.modelData?.paired)
-                            root.nState.closeSubPage();
-                    }
-
-                    target: newDevice.modelData
-                }
-
                 StateLayer {
                     radius: Tokens.rounding.extraSmall
                     bottomLeftRadius: newDevice.index === deviceList?.list.count - 1 ? Tokens.rounding.extraLarge : radius
                     bottomRightRadius: newDevice.index === deviceList?.list.count - 1 ? Tokens.rounding.extraLarge : radius
-                    disabled: newDevice.modelData?.pairing ?? false
+                    disabled: newDevice.isBusy
 
                     onClicked: {
-                        newDevice.modelData?.pair();
-                        newDevice.wasPairing = true;
+                        root.pairFailed = false;
+                        root.pairingDevice = newDevice.modelData;
+                        if (newDevice.modelData) {
+                            newDevice.modelData.trusted = true;
+                            newDevice.modelData.pair();
+                        }
                     }
                 }
 
@@ -146,8 +192,18 @@ PageBase {
 
                         StyledText {
                             Layout.fillWidth: true
-                            text: newDevice.modelData?.pairing ? qsTr("Pairing...") : (newDevice.modelData?.address ?? "")
-                            color: Colours.palette.m3outline
+                            text: {
+                                if (newDevice.isThisPairing && root.pairFailed)
+                                    return qsTr("Pairing failed");
+                                if (newDevice.isConnected)
+                                    return qsTr("Connected");
+                                if (newDevice.isConnecting)
+                                    return qsTr("Connecting…");
+                                if (newDevice.modelData?.pairing)
+                                    return qsTr("Pairing…");
+                                return newDevice.modelData?.address ?? "";
+                            }
+                            color: (newDevice.isThisPairing && root.pairFailed) ? Colours.palette.m3error : Colours.palette.m3outline
                             font: Tokens.font.label.small
                             elide: Text.ElideRight
                             animate: true
@@ -157,7 +213,7 @@ PageBase {
                     Loader {
                         asynchronous: true
                         active: opacity > 0
-                        opacity: newDevice.modelData?.pairing ? 1 : 0
+                        opacity: ((newDevice.modelData?.pairing ?? false) || newDevice.isConnecting) ? 1 : 0
 
                         sourceComponent: LoadingIndicator {
                             implicitSize: Math.round(Tokens.font.icon.medium.pointSize * 1.3)

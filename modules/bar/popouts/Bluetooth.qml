@@ -128,7 +128,11 @@ ColumnLayout {
                 StateLayer {
                     color: device.modelData.state === BluetoothDeviceState.Connected ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface // qmllint disable unresolved-type
                     disabled: device.loading
-                    onClicked: device.modelData.connected = !device.modelData.connected
+                    onClicked: {
+                        if (!device.modelData.connected && !device.modelData.trusted)
+                            device.modelData.trusted = true;
+                        device.modelData.connected = !device.modelData.connected;
+                    }
                 }
 
                 MaterialIcon {

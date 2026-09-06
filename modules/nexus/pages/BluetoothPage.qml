@@ -73,6 +73,8 @@ PageBase {
                     onClicked: {
                         if (!device.modelData || device.loading)
                             return;
+                        if (!device.connected && !device.modelData.trusted)
+                            device.modelData.trusted = true;
                         device.modelData.connected = !device.connected;
                     }
                 }

@@ -101,7 +101,12 @@ PageBase {
                 implicitWidth: connectBtnContent.implicitWidth + Tokens.padding.extraLarge * 2
                 implicitHeight: connectBtnContent.implicitHeight + Tokens.padding.medium * 2
 
-                onClicked: root.device.connected = !root.connected
+                onClicked: {
+                    if (!root.connected && root.device && !root.device.trusted)
+                        root.device.trusted = true;
+                    if (root.device)
+                        root.device.connected = !root.connected;
+                }
 
                 AnimLoader {
                     id: connectBtnContent
