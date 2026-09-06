@@ -43,7 +43,7 @@ Singleton {
     }
     readonly property string cheatsheetParser: {
         const configVal = GlobalConfig.paths && GlobalConfig.paths.cheatsheetParser;
-        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py";
+        return (configVal && configVal.trim() !== "") ? absolutePath(configVal) : "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py";
     }
     readonly property string eqControlScript: {
         const configVal = GlobalConfig.paths && GlobalConfig.paths.eqControlScript;

@@ -98,7 +98,7 @@ PageBase {
             label: qsTr("Keybinds Parser Script")
             subtext: qsTr("Python script parsing active window manager shortcuts")
             value: (GlobalConfig.paths && GlobalConfig.paths.cheatsheetParser) || ""
-            placeholderText: "/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
+            placeholderText: "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
             showBrowse: true
             onAccepted: text => GlobalConfig.paths.cheatsheetParser = text
         }

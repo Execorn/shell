@@ -23,7 +23,7 @@ class UserPaths : public ConfigObject {
     CONFIG_GLOBAL_PROPERTY(
         QString, screenshotDir, QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + u"/Screenshots"_s)
     CONFIG_GLOBAL_PROPERTY(
-        QString, cheatsheetParser, u"/home/execorn/teamwork_projects/hyprland_cheat_sheet/parser/parse_keybinds.py"_s)
+        QString, cheatsheetParser, u"/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py"_s)
     CONFIG_GLOBAL_PROPERTY(
         QString, eqControlScript, u"/home/execorn/scripts/eq-control.py"_s)
     CONFIG_GLOBAL_PROPERTY(
