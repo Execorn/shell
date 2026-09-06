@@ -12,8 +12,80 @@ Singleton {
     id: root
 
     readonly property list<MprisPlayer> list: Mpris.players.values
-    readonly property MprisPlayer active: props.manualActive ?? list.find(p => getIdentity(p) === GlobalConfig.services.defaultPlayer) ?? list[0] ?? null
+    property int _stateTrigger: 0
+
+    function isDummyPlayer(player: MprisPlayer): bool {
+        if (!player)
+            return true;
+        if (player.playbackState === MprisPlaybackState.Playing)
+            return false;
+        if (player.trackTitle && player.trackTitle.trim().length > 0)
+            return false;
+        return player.playbackState === MprisPlaybackState.Stopped;
+    }
+
+    readonly property MprisPlayer active: {
+        root._stateTrigger;
+
+        if (props.manualActive && list.includes(props.manualActive))
+            return props.manualActive;
+
+        // 1. Any player that is actively playing (prefer non-dummy)
+        const playing = list.find(p => p.playbackState === MprisPlaybackState.Playing && !isDummyPlayer(p))
+            ?? list.find(p => p.playbackState === MprisPlaybackState.Playing);
+        if (playing)
+            return playing;
+
+        // 2. User's configured default player if running and not an empty dummy
+        const defaultP = list.find(p => getIdentity(p) === GlobalConfig.services.defaultPlayer);
+        if (defaultP && !isDummyPlayer(defaultP))
+            return defaultP;
+
+        // 3. Paused player with actual track info
+        const pausedWithMedia = list.find(p => p.playbackState === MprisPlaybackState.Paused && (p.trackTitle || p.trackAlbum));
+        if (pausedWithMedia)
+            return pausedWithMedia;
+
+        // 4. Any player with loaded track metadata
+        const withMedia = list.find(p => (p.trackTitle && p.trackTitle.trim().length > 0) || (p.trackAlbum && p.trackAlbum.trim().length > 0));
+        if (withMedia)
+            return withMedia;
+
+        // 5. Default player even if idle
+        if (defaultP)
+            return defaultP;
+
+        // 6. Any player that isn't a dummy Bluetooth endpoint
+        const nonDummy = list.find(p => !isDummyPlayer(p));
+        if (nonDummy)
+            return nonDummy;
+
+        // 7. Absolute fallback
+        return list[0] ?? null;
+    }
     property alias manualActive: props.manualActive
+
+    Variants {
+        model: root.list
+
+        Connections {
+            required property MprisPlayer modelData
+
+            target: modelData
+
+            function onPlaybackStateChanged() {
+                root._stateTrigger++;
+            }
+
+            function onTrackTitleChanged() {
+                root._stateTrigger++;
+            }
+
+            function onTrackAlbumChanged() {
+                root._stateTrigger++;
+            }
+        }
+    }
 
     function getIdentity(player: MprisPlayer): string {
         if (!player)
@@ -29,10 +101,10 @@ Singleton {
             return player.trackArtUrl;
 
         const url = player.metadata["xesam:url"] ?? "";
-        if (url.startsWith("https://www.youtube.com/watch")) {
-            // Fallback for youtube
-            const id = url.match(/[?&]v=([\w-]{11})/)?.[1];
-            return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
+        if (typeof url === "string" && url.length > 0) {
+            const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([\w-]{11})/);
+            if (ytMatch && ytMatch[1])
+                return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
         }
         return "";
     }
@@ -106,6 +178,19 @@ Singleton {
         function getActive(prop: string): string {
             const active = root.active;
             return active ? active[prop] ?? "Invalid property" : "No active player";
+        }
+
+        function setActive(name: string): string {
+            if (name === "auto" || name === "clear" || name === "") {
+                props.manualActive = null;
+                return "Cleared manual player";
+            }
+            const found = root.list.find(p => root.getIdentity(p).toLowerCase() === name.toLowerCase() || p.identity.toLowerCase() === name.toLowerCase());
+            if (found) {
+                props.manualActive = found;
+                return `Set active player to ${root.getIdentity(found)}`;
+            }
+            return `Player not found: ${name}`;
         }
 
         function list(): string {
