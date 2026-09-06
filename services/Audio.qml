@@ -84,6 +84,28 @@ Singleton {
 
     property string preferredPhysicalSink: ""
     property string lastRoutedPhysicalSink: ""
+    property bool manualSinkOverride: false
+    property var knownPhysicalSinkNames: []
+    property string previousPhysicalSinkDesc: ""
+
+    readonly property string activePhysicalSinkDesc: {
+        const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
+        if (isNodeValid(dSink) && dSink.name === "riced_equalizer_sink") {
+            const node = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
+            if (node) return node.description || node.name || "";
+        } else if (isNodeValid(sink)) {
+            return sink.description || sink.name || "";
+        }
+        return "";
+    }
+
+    onActivePhysicalSinkDescChanged: {
+        if (!activePhysicalSinkDesc) return;
+        if (previousPhysicalSinkDesc && previousPhysicalSinkDesc !== activePhysicalSinkDesc && GlobalConfig.utilities.toasts.audioOutputChanged) {
+            Toaster.toast(qsTr("Audio output changed"), qsTr("Now using: %1").arg(activePhysicalSinkDesc), "volume_up");
+        }
+        previousPhysicalSinkDesc = activePhysicalSinkDesc;
+    }
 
     readonly property Process eqRouteProc: Process {}
 
@@ -97,23 +119,39 @@ Singleton {
     }
 
     function routeEqualizerTo(sinkName: string): void {
+        if (!sinkName) return;
         eqRouteProc.running = false;
         eqRouteProc.command = [
-            "bash", "-c",
-            `id=$(pactl list sink-inputs | grep -B 20 "Riced Equalizer Sink" | grep "Sink Input #" | cut -d'#' -f2 | tr -d ' '); if [ ! -z "$id" ]; then pactl move-sink-input "$id" "${sinkName}"; fi`
+            "python3", "-c",
+            `import subprocess, sys
+target = sys.argv[1]
+try:
+    out = subprocess.check_output(["pactl", "list", "sink-inputs"]).decode("utf-8", errors="replace")
+    for block in out.split("Sink Input #"):
+        if not block.strip(): continue
+        lines = block.splitlines()
+        sid = lines[0].strip()
+        if "output.filter-chain" in block or "Riced Equalizer Sink" in block:
+            subprocess.run(["pactl", "move-sink-input", sid, target], check=True)
+except Exception as e:
+    pass
+`,
+            sinkName
         ];
         eqRouteProc.running = true;
     }
 
     function setAudioSink(newSink: var): void {
+        if (!newSink || !newSink.name) return;
+        manualSinkOverride = true;
+        preferredPhysicalSink = newSink.name;
         if (Pipewire) {
-            const isEQ = isNodeValid(sink) && sink.name === "riced_equalizer_sink";
+            const dSink = Pipewire.defaultAudioSink;
+            const isEQ = isNodeValid(dSink) && dSink.name === "riced_equalizer_sink";
             if (isEQ) {
-                preferredPhysicalSink = newSink.name;
                 Qt.callLater(root.updateActiveSink);
             } else {
                 Pipewire.preferredDefaultAudioSink = newSink;
-                preferredPhysicalSink = newSink.name;
             }
         }
     }
@@ -135,7 +173,7 @@ Singleton {
         // 1. Look for Bluetooth headphones/speakers
         for (let i = 0; i < physicalSinks.length; i++) {
             const s = physicalSinks[i];
-            if (isNodeValid(s) && s.name && s.name.indexOf("bluez_output") === 0) {
+            if (isNodeValid(s) && s.name && (s.name.indexOf("bluez_output") !== -1 || s.name.indexOf("bluez_sink") !== -1)) {
                 return s.name;
             }
         }
@@ -177,26 +215,43 @@ Singleton {
     }
 
     function updateActiveSink(): void {
+        const prefExists = physicalSinks.some(s => isNodeValid(s) && s.name === preferredPhysicalSink);
+        if (!prefExists) {
+            root.manualSinkOverride = false;
+            preferredPhysicalSink = "";
+        }
+
+        if (!root.manualSinkOverride || preferredPhysicalSink === "") {
+            const bestName = getBestOutputSinkName();
+            if (bestName !== "") {
+                preferredPhysicalSink = bestName;
+            }
+        }
+
+        const activeNode = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
         const bestSinkName = getBestOutputSinkName();
         const bestSinkNode = physicalSinks.find(s => isNodeValid(s) && s.name === bestSinkName);
-        root.physicalDriverId = bestSinkNode ? bestSinkNode.id : -1;
+        root.physicalDriverId = activeNode ? activeNode.id : (bestSinkNode ? bestSinkNode.id : -1);
 
         const sinkMapStr = sinks.filter(isNodeValid).map(n => n.id + ":" + (n.name || "")).join(", ");
-        console.log("[Audio.qml debug] updateActiveSink called. physicalDriverId:", root.physicalDriverId, "sinks:", sinkMapStr);
+        console.log("[Audio.qml debug] updateActiveSink called. physicalDriverId:", root.physicalDriverId, "prefPhysicalSink:", preferredPhysicalSink, "override:", root.manualSinkOverride, "sinks:", sinkMapStr);
         let resolvedSink = null;
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         if (isNodeValid(dSink)) {
             const isEQ = dSink.name === "riced_equalizer_sink";
             if (isEQ) {
-                if (preferredPhysicalSink === "") {
-                    preferredPhysicalSink = getBestOutputSinkName();
-                }
                 if (preferredPhysicalSink !== "" && preferredPhysicalSink !== lastRoutedPhysicalSink) {
                     routeEqualizerTo(preferredPhysicalSink);
                     lastRoutedPhysicalSink = preferredPhysicalSink;
                 }
             } else {
                 lastRoutedPhysicalSink = "";
+                if (preferredPhysicalSink !== "") {
+                    const targetNode = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
+                    if (targetNode && Pipewire.preferredDefaultAudioSink !== targetNode) {
+                        Pipewire.preferredDefaultAudioSink = targetNode;
+                    }
+                }
             }
 
             if (dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink") {
@@ -233,8 +288,8 @@ Singleton {
         if (physicalSinks.length === 0)
             return;
 
-        const currentIndex = physicalSinks.findIndex(s => s === sink);
-        const nextIndex = (currentIndex + 1) % physicalSinks.length;
+        const currentIndex = physicalSinks.findIndex(s => s.id === root.activePhysicalSinkId);
+        const nextIndex = currentIndex !== -1 ? (currentIndex + 1) % physicalSinks.length : 0;
         setAudioSink(physicalSinks[nextIndex]);
     }
 
@@ -290,7 +345,8 @@ Singleton {
 
         const newSinkName = sink.description || sink.name || qsTr("Unknown Device");
 
-        if (previousSinkName && previousSinkName !== newSinkName && GlobalConfig.utilities.toasts.audioOutputChanged)
+        const isEQ = sink.name === "riced_equalizer_sink";
+        if (!isEQ && previousSinkName && previousSinkName !== newSinkName && GlobalConfig.utilities.toasts.audioOutputChanged)
             Toaster.toast(qsTr("Audio output changed"), qsTr("Now using: %1").arg(newSinkName), "volume_up");
 
         previousSinkName = newSinkName;
@@ -364,6 +420,21 @@ Singleton {
         root.physicalSinks = newPhysicalSinks;
         root.physicalSources = newPhysicalSources;
 
+        const currentPhysicalNames = newPhysicalSinks.map(s => s.name);
+        if (root.knownPhysicalSinkNames.length > 0) {
+            for (let i = 0; i < currentPhysicalNames.length; i++) {
+                const name = currentPhysicalNames[i];
+                if (root.knownPhysicalSinkNames.indexOf(name) === -1) {
+                    console.log("[Audio.qml] Newly connected physical sink:", name);
+                    if (name.indexOf("bluez_output") !== -1 || name.indexOf("bluez_sink") !== -1 || name.indexOf("usb") !== -1) {
+                        console.log("[Audio.qml] Auto-switching to newly connected priority device:", name);
+                        root.manualSinkOverride = false;
+                    }
+                }
+            }
+        }
+        root.knownPhysicalSinkNames = currentPhysicalNames;
+
         let objectsChanged = false;
         if (!tracker.objects || tracker.objects.length !== trackerObjects.length) {
             objectsChanged = true;
@@ -385,6 +456,7 @@ Singleton {
     Component.onCompleted: {
         previousSinkName = isNodeValid(sink) ? (sink.description || sink.name) : qsTr("Unknown Device");
         previousSourceName = isNodeValid(source) ? (source.description || source.name) : qsTr("Unknown Device");
+        previousPhysicalSinkDesc = activePhysicalSinkDesc;
         root.syncNodes();
     }
 
