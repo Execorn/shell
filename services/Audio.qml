@@ -41,7 +41,7 @@ Singleton {
 
     function setVolume(newVolume: real): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
-        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink";
+        const isVirtual = isNodeValid(dSink) && ((dSink.properties && dSink.properties["node.virtual"] === "true") || dSink.name === "easyeffects_sink" || dSink.name === "riced_equalizer_sink");
         const targetId = (isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (isNodeValid(sink) ? sink.id : -1);
 
         if (targetId !== -1) {
@@ -145,6 +145,7 @@ except Exception as e:
         if (!newSink || !newSink.name) return;
         manualSinkOverride = true;
         preferredPhysicalSink = newSink.name;
+        root.lastConfiguredPhysicalSink = newSink.name;
         if (Pipewire) {
             const dSink = Pipewire.defaultAudioSink;
             const isEQ = isNodeValid(dSink) && dSink.name === "riced_equalizer_sink";
@@ -156,6 +157,7 @@ except Exception as e:
         }
     }
 
+    property string lastConfiguredPhysicalSink: ""
     property string preferredPhysicalSource: ""
     property string lastRoutedPhysicalSource: ""
     property bool manualSourceOverride: false
@@ -319,21 +321,27 @@ except Exception:
                     routeEqualizerTo(preferredPhysicalSink);
                     lastRoutedPhysicalSink = preferredPhysicalSink;
                 }
+                if (dSink.audio && (dSink.audio.volume < 0.99 || dSink.audio.muted)) {
+                    dSink.audio.muted = false;
+                    dSink.audio.volume = 1.0;
+                }
             } else {
                 lastRoutedPhysicalSink = "";
-                if (preferredPhysicalSink !== "") {
+                if (!root.manualSinkOverride && preferredPhysicalSink !== "" && preferredPhysicalSink !== root.lastConfiguredPhysicalSink) {
                     const targetNode = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
                     if (targetNode && Pipewire.preferredDefaultAudioSink !== targetNode) {
                         Pipewire.preferredDefaultAudioSink = targetNode;
                     }
+                    root.lastConfiguredPhysicalSink = preferredPhysicalSink;
                 }
             }
 
-            if (dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink") {
+            const isVirtualSink = (dSink.properties && dSink.properties["node.virtual"] === "true") || dSink.name === "easyeffects_sink" || dSink.name === "riced_equalizer_sink";
+            if (isVirtualSink) {
                 const driverId = root.physicalDriverId;
                 if (driverId !== -1) {
                     const physicalSink = sinks.find(n => isNodeValid(n) && n.id === driverId);
-                    if (physicalSink && physicalSink.properties && physicalSink.properties["node.virtual"] !== "true" && physicalSink.name !== "easyeffects_sink") {
+                    if (physicalSink && (!physicalSink.properties || physicalSink.properties["node.virtual"] !== "true") && physicalSink.name !== "easyeffects_sink" && physicalSink.name !== "riced_equalizer_sink") {
                         resolvedSink = physicalSink;
                     }
                 }
@@ -341,7 +349,7 @@ except Exception:
                     root.customVolume = -1;
                     root.customMuted = -1;
                     const prefSink = Pipewire ? Pipewire.preferredDefaultAudioSink : null;
-                    if (isNodeValid(prefSink) && prefSink.properties && prefSink.properties["node.virtual"] !== "true" && prefSink.name !== "easyeffects_sink") {
+                    if (isNodeValid(prefSink) && (!prefSink.properties || prefSink.properties["node.virtual"] !== "true") && prefSink.name !== "easyeffects_sink" && prefSink.name !== "riced_equalizer_sink") {
                         resolvedSink = prefSink;
                     } else {
                         resolvedSink = physicalSinks.find(isNodeValid) || null;
@@ -443,7 +451,7 @@ except Exception:
 
     function setStreamMuted(stream: var, muted: bool): void {
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
-        const isVirtual = isNodeValid(dSink) && dSink.properties && (dSink.properties["node.virtual"] === "true" || dSink.name === "easyeffects_sink") && dSink.name !== "riced_equalizer_sink";
+        const isVirtual = isNodeValid(dSink) && ((dSink.properties && dSink.properties["node.virtual"] === "true") || dSink.name === "easyeffects_sink" || dSink.name === "riced_equalizer_sink");
         const targetId = (stream === root.sink && isVirtual && root.physicalDriverId !== -1) ? root.physicalDriverId : (stream === root.sink && isNodeValid(root.sink) ? root.sink.id : -1);
 
         if (targetId !== -1) {

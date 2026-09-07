@@ -24,6 +24,24 @@ Singleton {
     }
 
     Process {
+        id: applyProc
+
+        property string toastMsg: ""
+        property string toastIcon: "music_note"
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) {
+                if (toastMsg !== "") {
+                    Toaster.toast(qsTr("Equalizer"), toastMsg, toastIcon);
+                }
+            } else {
+                Toaster.toast(qsTr("Equalizer"), qsTr("Failed to apply equalizer setting"), "error");
+            }
+            root.reload();
+        }
+    }
+
+    Process {
         id: getPresets
 
         running: true
@@ -45,28 +63,28 @@ Singleton {
                                 list.visibilities.launcher = false;
                                 
                                 let cmd = [];
-                                let toastTitle = qsTr("Equalizer");
                                 let toastMsg = "";
                                 let toastIcon = "music_note";
                                 
                                 if (item.id === "on") {
-                                    cmd = [Paths.eqControlScript, "on"];
+                                    cmd = ["/usr/bin/python3", "-u", Paths.eqControlScript, "on"];
                                     toastMsg = qsTr("Equalizer Enabled");
                                     toastIcon = "volume_up";
                                 } else if (item.id === "off") {
-                                    cmd = [Paths.eqControlScript, "off"];
+                                    cmd = ["/usr/bin/python3", "-u", Paths.eqControlScript, "off"];
                                     toastMsg = qsTr("Equalizer Bypassed");
                                     toastIcon = "volume_off";
                                 } else {
-                                    cmd = [Paths.eqControlScript, "apply", item.id];
+                                    cmd = ["/usr/bin/python3", "-u", Paths.eqControlScript, "apply", item.id];
                                     toastMsg = qsTr("Preset Applied: %1").arg((item.name ?? "").replace("Preset: ", ""));
                                     toastIcon = "music_note";
                                 }
                                 
-                                Quickshell.execDetached(cmd);
-                                Toaster.toast(toastTitle, toastMsg, toastIcon);
-                                
-                                root.reload();
+                                applyProc.command = cmd;
+                                applyProc.toastMsg = toastMsg;
+                                applyProc.toastIcon = toastIcon;
+                                applyProc.running = false;
+                                applyProc.running = true;
                             }
                         };
                     });
@@ -104,25 +122,40 @@ Singleton {
     }
 
     function query(search: string): var {
-        const prefix = `${GlobalConfig.launcher.actionPrefix}eq`; // e.g. ">eq"
+        const actionPrefix = GlobalConfig.launcher.actionPrefix; // e.g. ">"
         const cleanSearch = search.trim().replace(/\s+/g, " ");
-        const presetsPrefix = `${prefix} preset`; // e.g. ">eq preset"
         
         console.log("[EQs.qml debug] query called with search:", search, "cleanSearch:", cleanSearch, "presetsList length:", presetsList.length);
         
         const presets = root.presetsList;
         
-        if (cleanSearch.startsWith(presetsPrefix)) {
+        const eqPresetPfx = `${actionPrefix}eq preset`;
+        const presetPfx = `${actionPrefix}preset`;
+
+        let isPresets = false;
+        let subQuery = "";
+
+        if (cleanSearch.startsWith(eqPresetPfx)) {
+            isPresets = true;
+            let rest = cleanSearch.slice(eqPresetPfx.length);
+            if (rest.startsWith("s")) rest = rest.slice(1);
+            subQuery = rest.trim().toLowerCase();
+        } else if (cleanSearch.startsWith(presetPfx)) {
+            isPresets = true;
+            let rest = cleanSearch.slice(presetPfx.length);
+            if (rest.startsWith("s")) rest = rest.slice(1);
+            subQuery = rest.trim().toLowerCase();
+        }
+        if (isPresets) {
             // ----------------------------------------------------
             // Sub-Group: Choose Presets
             // ----------------------------------------------------
-            const subQuery = cleanSearch.slice(presetsPrefix.length).trim().toLowerCase();
             
             // Filter all presets (excluding on/off toggle items)
             const filteredPresets = presets.filter(p => {
                 if (p.id === "on" || p.id === "off") return false;
                 if (!subQuery) return true;
-                return p.name.toLowerCase().includes(subQuery) || p.desc.toLowerCase().includes(subQuery);
+                return p.name.toLowerCase().includes(subQuery) || p.desc.toLowerCase().includes(subQuery) || p.id.toLowerCase().includes(subQuery);
             });
             
             // If the query isn't empty, provide an option to download/install it
@@ -148,7 +181,7 @@ Singleton {
             return filteredPresets;
         } else {
             // ----------------------------------------------------
-            // Main Group: Equalizer Options
+            // Main Group: Equalizer Options (>eq)
             // ----------------------------------------------------
             const mainItems = [];
             
@@ -163,15 +196,19 @@ Singleton {
                 "desc": qsTr("Select or install parametric EQ presets"),
                 "icon": "settings",
                 "onClicked": function(list) {
-                    list.search.text = `${GlobalConfig.launcher.actionPrefix}eq preset `;
+                    list.search.text = `${actionPrefix}eq preset `;
                 }
             });
             
-            const subQuery = cleanSearch.slice(prefix.length).trim().toLowerCase();
-            if (!subQuery) {
+            const eqPrefix = `${actionPrefix}eq`;
+            let mainSubQuery = "";
+            if (cleanSearch.startsWith(eqPrefix)) {
+                mainSubQuery = cleanSearch.slice(eqPrefix.length).trim().toLowerCase();
+            }
+            if (!mainSubQuery) {
                 return mainItems;
             }
-            return mainItems.filter(item => item.name.toLowerCase().includes(subQuery) || item.desc.toLowerCase().includes(subQuery));
+            return mainItems.filter(item => item.name.toLowerCase().includes(mainSubQuery) || item.desc.toLowerCase().includes(mainSubQuery));
         }
     }
 }

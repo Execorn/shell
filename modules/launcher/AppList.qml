@@ -199,6 +199,20 @@ StyledListView {
     model: ScriptModel {
         id: model
 
+        values: {
+            switch (root.state) {
+            case "apps": return root.appsList;
+            case "actions": return root.actionsList;
+            case "calc": return [0];
+            case "scheme": return root.schemesList;
+            case "variant": return root.variantsList;
+            case "eq": return root.eqList;
+            case "monitors": return root.monitorsList;
+            case "gamemode": return root.gamemodeList;
+            default: return [];
+            }
+        }
+
         onValuesChanged: {
             if (root.activeGroup !== null) {
                 root.currentIndex = 0;
@@ -234,10 +248,20 @@ StyledListView {
         }
     }
 
+    readonly property var eqList: (EQs.presetsList, EQs.query(search.text))
+    readonly property var actionsList: Actions.query(search.text)
+    readonly property var schemesList: Schemes.query(search.text)
+    readonly property var variantsList: M3Variants.query(search.text)
+    readonly property var monitorsList: Monitors.query(search.text)
+    readonly property var gamemodeList: GameModeLauncher.query(search.text)
+
     state: {
         const text = search.text;
         const prefix = GlobalConfig.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
+            if (text.startsWith(`${prefix}preset`))
+                return "eq";
+
             for (const action of ["calc", "scheme", "variant", "eq", "monitors", "gamemode"])
                 if (text.startsWith(`${prefix}${action} `) || text === `${prefix}${action}`)
                     return action;
@@ -260,7 +284,6 @@ StyledListView {
             name: "apps"
 
             PropertyChanges {
-                model.values: root.appsList
                 root.delegate: appItem
             }
         },
@@ -268,7 +291,6 @@ StyledListView {
             name: "actions"
 
             PropertyChanges {
-                model.values: Actions.query(search.text)
                 root.delegate: actionItem
             }
         },
@@ -276,7 +298,6 @@ StyledListView {
             name: "calc"
 
             PropertyChanges {
-                model.values: [0]
                 root.delegate: calcItem
             }
         },
@@ -284,7 +305,6 @@ StyledListView {
             name: "scheme"
 
             PropertyChanges {
-                model.values: Schemes.query(search.text)
                 root.delegate: schemeItem
             }
         },
@@ -292,7 +312,6 @@ StyledListView {
             name: "variant"
 
             PropertyChanges {
-                model.values: M3Variants.query(search.text)
                 root.delegate: variantItem
             }
         },
@@ -300,7 +319,6 @@ StyledListView {
             name: "eq"
 
             PropertyChanges {
-                model.values: (EQs.presetsList, EQs.query(search.text))
                 root.delegate: actionItem
             }
         },
@@ -308,7 +326,6 @@ StyledListView {
             name: "monitors"
 
             PropertyChanges {
-                model.values: Monitors.query(search.text)
                 root.delegate: actionItem
             }
         },
@@ -316,7 +333,6 @@ StyledListView {
             name: "gamemode"
 
             PropertyChanges {
-                model.values: GameModeLauncher.query(search.text)
                 root.delegate: actionItem
             }
         }
@@ -343,8 +359,8 @@ StyledListView {
                 }
             }
             PropertyAction {
-                targets: [model, root]
-                properties: "values,delegate"
+                targets: [root]
+                properties: "delegate"
             }
             ParallelAnimation {
                 Anim {

@@ -31,6 +31,13 @@ Searcher {
                 "enabled": true
             });
             list.push({
+                "name": qsTr("Equalizer Presets"),
+                "description": qsTr("Select or download equalizer presets"),
+                "icon": "tune",
+                "command": ["autocomplete", "eq preset"],
+                "enabled": true
+            });
+            list.push({
                 "name": qsTr("Monitors"),
                 "description": qsTr("Enable or disable external monitors for gaming"),
                 "icon": "desktop_windows",
