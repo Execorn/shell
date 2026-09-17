@@ -15,6 +15,11 @@ Searcher {
         return search.slice(GlobalConfig.launcher.actionPrefix.length);
     }
 
+    function selector(item: var): string {
+        return `${item.name} ${item.desc}`;
+    }
+
+    keys: ["name", "desc"]
     list: variants.instances
     useFuzzy: GlobalConfig.launcher.useFuzzy.actions
 
@@ -22,7 +27,42 @@ Searcher {
         id: variants
 
         model: {
-            const list = GlobalConfig.launcher.actions.filter(a => (a.enabled ?? true) && (GlobalConfig.launcher.enableDangerousActions || !(a.dangerous ?? false)));
+            const list = GlobalConfig.launcher.actions.filter(a => (a.enabled ?? true) && (GlobalConfig.launcher.enableDangerousActions || !(a.dangerous ?? false)) && a.name !== "Random");
+            list.push({
+                "name": qsTr("Random Wallpaper"),
+                "description": qsTr("Switch to a random wallpaper immediately"),
+                "icon": "casino",
+                "onClicked": function(list) {
+                    list.visibilities.launcher = false;
+                    Wallpapers.setRandom();
+                },
+                "enabled": true
+            });
+            list.push({
+                "name": qsTr("Wallpaper on Boot: %1").arg(Wallpapers.randomOnBoot ? qsTr("Random") : qsTr("Last Saved")),
+                "description": qsTr("Toggle random wallpaper on startup (currently %1)").arg(Wallpapers.randomOnBoot ? qsTr("random") : qsTr("last saved")),
+                "icon": Wallpapers.randomOnBoot ? "restart_alt" : "save",
+                "onClicked": function(list) {
+                    Wallpapers.toggleRandomOnBoot();
+                },
+                "enabled": true
+            });
+            list.push({
+                "name": qsTr("Wallpaper Slideshow: %1").arg(Wallpapers.slideshowEnabled ? qsTr("Running") : qsTr("Stopped")),
+                "description": qsTr("Toggle automatic wallpaper slideshow (every %1m)").arg(Math.max(1, Math.round(Wallpapers.slideshowIntervalSec / 60))),
+                "icon": Wallpapers.slideshowEnabled ? "pause_circle" : "play_circle",
+                "onClicked": function(list) {
+                    Wallpapers.toggleSlideshow();
+                },
+                "enabled": true
+            });
+            list.push({
+                "name": qsTr("Wallpaper Slideshow Interval"),
+                "description": qsTr("Change slideshow duration (currently %1m)").arg(Math.max(1, Math.round(Wallpapers.slideshowIntervalSec / 60))),
+                "icon": "timer",
+                "command": ["autocomplete", "slideshow"],
+                "enabled": true
+            });
             list.push({
                 "name": qsTr("Equalizer"),
                 "description": qsTr("Change the current equalizer settings / preset"),
@@ -67,6 +107,10 @@ Searcher {
         readonly property bool dangerous: modelData.dangerous ?? false
 
         function onClicked(list: AppList): void {
+            if (typeof modelData.onClicked === "function") {
+                modelData.onClicked(list);
+                return;
+            }
             if (command.length === 0)
                 return;
 

@@ -25,6 +25,27 @@ Item {
     implicitWidth: image.width + Tokens.padding.medium * 2
     implicitHeight: image.height + label.height + Tokens.spacing.extraSmall + Tokens.padding.large + Tokens.padding.medium
 
+    property real scrollAccumulated: 0
+
+    WheelHandler {
+        target: null
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (event) => {
+            const delta = event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x;
+            if (Math.sign(delta) !== Math.sign(root.scrollAccumulated))
+                root.scrollAccumulated = 0;
+            root.scrollAccumulated += delta;
+            if (Math.abs(root.scrollAccumulated) >= 120) {
+                if (root.scrollAccumulated < 0)
+                    root.PathView.view.incrementCurrentIndex();
+                else
+                    root.PathView.view.decrementCurrentIndex();
+                root.scrollAccumulated = 0;
+            }
+            event.accepted = true;
+        }
+    }
+
     StateLayer {
         radius: Tokens.rounding.large
         onClicked: {

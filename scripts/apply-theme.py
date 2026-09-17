@@ -192,6 +192,7 @@ def generate_scheme_from_primary(primary_rgb, mode="dark"):
 def main():
     parser = argparse.ArgumentParser(description="Extract theme colors and inject live settings.")
     parser.add_argument("--wallpaper", required=True, help="Path to wallpaper file.")
+    parser.add_argument("--no-wwal", action="store_true", help="Do not call wwal-helper (caller handles wallpaper transition).")
     args = parser.parse_args()
 
     wallpaper_path = os.path.abspath(args.wallpaper)
@@ -250,21 +251,21 @@ def main():
                 dom_idx = sorted_colors[0][0]
                 primary_rgb = (palette[dom_idx*3], palette[dom_idx*3+1], palette[dom_idx*3+2])
 
-            scheme = generate_scheme_from_primary(primary_rgb)
+            fallback_scheme = generate_scheme_from_primary(primary_rgb, mode="dark")
 
             # Write scheme.json
             os.makedirs(os.path.dirname(scheme_json_path), exist_ok=True)
             with open(scheme_json_path, "w") as f:
-                json.dump(scheme, f, indent=2)
+                json.dump(fallback_scheme, f, indent=4)
 
-            # Write current.conf for Hyprland variables
+            # Write hyprland current.conf
             os.makedirs(os.path.dirname(hypr_conf_path), exist_ok=True)
             with open(hypr_conf_path, "w") as f:
-                for name, hex_val in scheme["colours"].items():
-                    f.write(f"${name} = {hex_val}\n")
+                for k, v in fallback_scheme["colours"].items():
+                    f.write(f"${k} = rgba({v}ff)\n")
 
         except Exception as e:
-            print(f"Error during custom Pillow extraction: {e}", file=sys.stderr)
+            print(f"Error during fallback extraction: {e}", file=sys.stderr)
             sys.exit(1)
 
     # Always ensure the wallpaper path state is written
@@ -274,6 +275,15 @@ def main():
             f.write(wallpaper_path)
     except Exception as e:
         print(f"Warning: Could not write active wallpaper path: {e}", file=sys.stderr)
+
+    # Ensure wwal applies the wallpaper if wwal is installed and not skipped
+    if not args.no_wwal:
+        try:
+            wwal_helper = os.path.join(os.path.dirname(__file__), "wwal-helper.py")
+            if os.path.exists(wwal_helper):
+                subprocess.run([sys.executable, wwal_helper, "set", wallpaper_path], check=False)
+        except Exception as e:
+            print(f"Warning: Could not invoke wwal-helper: {e}", file=sys.stderr)
 
     # 2. Perform live color injection
     

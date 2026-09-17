@@ -53,12 +53,43 @@ PathView {
         onValuesChanged: root.currentIndex = search ? 0 : values.findIndex(w => w.path === Wallpapers.actualCurrent)
     }
 
-    Component.onCompleted: currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent)
+    function getSelectedPath(): string {
+        return scriptModel.values[currentIndex]?.path ?? (currentItem as WallpaperItem)?.modelData?.path ?? "";
+    }
+
+    function triggerPreview(): void {
+        const p = getSelectedPath();
+        if (p)
+            Wallpapers.preview(p);
+    }
+
+    Component.onCompleted: {
+        currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent);
+        triggerPreview();
+    }
     Component.onDestruction: Wallpapers.stopPreview()
 
-    onCurrentItemChanged: {
-        if (currentItem)
-            Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
+    onCurrentIndexChanged: triggerPreview()
+    onCurrentItemChanged: triggerPreview()
+
+    property real scrollAccumulated: 0
+
+    WheelHandler {
+        target: null
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: (event) => {
+            const delta = event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x;
+            if (Math.sign(delta) !== Math.sign(root.scrollAccumulated))
+                root.scrollAccumulated = 0;
+            root.scrollAccumulated += delta;
+            if (Math.abs(root.scrollAccumulated) >= 120) {
+                if (root.scrollAccumulated < 0)
+                    root.incrementCurrentIndex();
+                else
+                    root.decrementCurrentIndex();
+                root.scrollAccumulated = 0;
+            }
+        }
     }
 
     implicitWidth: Math.min(numItems, count) * itemWidth

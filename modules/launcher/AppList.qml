@@ -209,6 +209,7 @@ StyledListView {
             case "eq": return root.eqList;
             case "monitors": return root.monitorsList;
             case "gamemode": return root.gamemodeList;
+            case "slideshow": return root.slideshowList;
             default: return [];
             }
         }
@@ -254,6 +255,7 @@ StyledListView {
     readonly property var variantsList: M3Variants.query(search.text)
     readonly property var monitorsList: Monitors.query(search.text)
     readonly property var gamemodeList: GameModeLauncher.query(search.text)
+    readonly property var slideshowList: SlideshowLauncher.query(search.text)
 
     state: {
         const text = search.text;
@@ -262,7 +264,7 @@ StyledListView {
             if (text.startsWith(`${prefix}preset`))
                 return "eq";
 
-            for (const action of ["calc", "scheme", "variant", "eq", "monitors", "gamemode"])
+            for (const action of ["calc", "scheme", "variant", "eq", "monitors", "gamemode", "slideshow"])
                 if (text.startsWith(`${prefix}${action} `) || text === `${prefix}${action}`)
                     return action;
 
@@ -331,6 +333,13 @@ StyledListView {
         },
         State {
             name: "gamemode"
+
+            PropertyChanges {
+                root.delegate: actionItem
+            }
+        },
+        State {
+            name: "slideshow"
 
             PropertyChanges {
                 root.delegate: actionItem

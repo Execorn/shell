@@ -83,14 +83,21 @@ Item {
             placeholderText: qsTr("Type \"%1\" for commands").arg(GlobalConfig.launcher.actionPrefix)
 
             onAccepted: {
+                if (list.showWallpapers) {
+                    const wallPath = (typeof list.currentList?.getSelectedPath === "function")
+                        ? list.currentList.getSelectedPath()
+                        : list.currentList?.currentItem?.modelData?.path;
+                    if (wallPath) {
+                        if (Colours.scheme === "dynamic" && wallPath !== Wallpapers.actualCurrent)
+                            Wallpapers.previewColourLock = true;
+                        Wallpapers.setWallpaper(wallPath);
+                        root.visibilities.launcher = false;
+                        return;
+                    }
+                }
                 const currentItem = list.currentList?.currentItem;
                 if (currentItem) {
-                    if (list.showWallpapers) {
-                        if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
-                            Wallpapers.previewColourLock = true;
-                        Wallpapers.setWallpaper(currentItem.modelData.path);
-                        root.visibilities.launcher = false;
-                    } else if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
+                    if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
                         if (text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
                             currentItem.onClicked();
                         else

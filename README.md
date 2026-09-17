@@ -28,6 +28,12 @@ This is a personal fork of the original [caelestia-dots/shell](https://github.co
   - Removed the surrounding dark background shape of the notification drawer, leaving it completely transparent so only the styled cards themselves render over the desktop.
 - **AI Copilot Sidebar**:
   - Integrates a conversational desktop assistant sidebar tab with LLM APIs (Ollama/Gemini) to execute actions (volume adjustments, launcher drawers, workspaces) using parsed JSON code blocks.
+- **[`wwal`](https://github.com/execorn/wwal) Animated Wallpaper Engine & Slideshow Integration**:
+  - Fully integrated with [**wwal**](https://github.com/execorn/wwal) (Execorn's Wayland animated wallpaper daemon and CLI).
+  - **Live Scrolling Carousel Preview**: Instant wallpaper preview when scrolling through the gallery (`>wallpaper `) in the launcher with configurable random animated transitions (e.g. fade, wipe, grow, wave, glitch, burn, pixelate, page_curl, etc.).
+  - **Automatic Wallpaper Slideshow**: Configurable background slideshow cycling wallpapers randomly on any interval (`>slideshow` launcher menu, IPC methods, or `~/.config/caelestia/wwal.json`).
+  - **Random on Boot**: Toggle between booting into a fresh random wallpaper with random transition effects or restoring the last saved wallpaper.
+  - **Full Theme Synchronization**: Automatically synchronizes Hyprland window borders, terminal color schemes (kitty, alacritty), and Caelestia Material You color palettes across every wallpaper transition.
 
 ---
 
