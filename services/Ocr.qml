@@ -12,7 +12,6 @@ Singleton {
     id: root
 
     property string ocrText: ""
-    property string translatedText: ""
     property bool running: false
     property string lastError: ""
     property string activeDrawer: ""
@@ -84,7 +83,6 @@ Singleton {
 
     function startOcr(): void {
         ocrText = "";
-        translatedText = "";
         lastError = "";
         running = true;
         activeDrawer = "";
@@ -114,122 +112,6 @@ Singleton {
         } else {
             startProcess();
         }
-    }
-
-    function translateText(targetLang: string): void {
-        if (!ocrText.trim()) return;
-
-        translatedText = "... translating ...";
-        lastError = "";
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "http://localhost:11434/api/chat", true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.timeout = 10000;
-        xhr.ontimeout = function() {
-            root.translatedText = "";
-            root.lastError = "Ollama connection error. (Request timed out)";
-            console.error("[Ocr.qml translation timeout]");
-        };
-        xhr.onerror = function() {
-            root.translatedText = "";
-            root.lastError = "Ollama connection error. (Request failed)";
-            console.error("[Ocr.qml translation error]");
-        };
-
-        const payload = {
-            "model": "llama3:latest",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a professional desktop translator. Translate the text exactly into the requested language. Provide ONLY the direct translation. Do not include markdown blocks, greetings, explanations, or any extra text."
-                },
-                {
-                    "role": "user",
-                    "content": "Translate the following text into " + targetLang + ":\n\n" + ocrText
-                }
-            ],
-            "stream": false
-        };
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        root.translatedText = response.message.content.trim();
-                    } catch (e) {
-                        root.translatedText = "";
-                        root.lastError = "Translation failed.";
-                    }
-                } else {
-                    if (!root.lastError) {
-                        root.translatedText = "";
-                        root.lastError = "Ollama connection error.";
-                    }
-                }
-            }
-        };
-
-        xhr.send(JSON.stringify(payload));
-    }
-
-    function explainText(): void {
-        if (!ocrText.trim()) return;
-
-        translatedText = "... explaining ...";
-        lastError = "";
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "http://localhost:11434/api/chat", true);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.timeout = 10000;
-        xhr.ontimeout = function() {
-            root.translatedText = "";
-            root.lastError = "Ollama connection error. (Request timed out)";
-            console.error("[Ocr.qml explanation timeout]");
-        };
-        xhr.onerror = function() {
-            root.translatedText = "";
-            root.lastError = "Ollama connection error. (Request failed)";
-            console.error("[Ocr.qml explanation error]");
-        };
-
-        const payload = {
-            "model": "llama3:latest",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful desktop assistant. Briefly explain the meaning or context of the provided screen-captured text in 1-2 concise sentences."
-                },
-                {
-                    "role": "user",
-                    "content": "Explain the following text:\n\n" + ocrText
-                }
-            ],
-            "stream": false
-        };
-
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        root.translatedText = response.message.content.trim();
-                    } catch (e) {
-                        root.translatedText = "";
-                        root.lastError = "Explanation failed.";
-                    }
-                } else {
-                    if (!root.lastError) {
-                        root.translatedText = "";
-                        root.lastError = "Ollama connection error.";
-                    }
-                }
-            }
-        };
-
-        xhr.send(JSON.stringify(payload));
     }
 
     IpcHandler {

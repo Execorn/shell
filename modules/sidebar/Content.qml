@@ -23,7 +23,6 @@ Item {
         StyledRect {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredHeight: rootRange.activeTab === "notifications" ? parent.height * 0.65 : parent.height
 
             radius: Tokens.rounding.large
             color: Colours.tPalette.m3surfaceContainerLow
@@ -104,21 +103,6 @@ Item {
                     props: rootRange.utilitiesProps
                     visibilities: rootRange.visibilities
                 }
-            }
-        }
-
-        StyledRect {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredHeight: parent.height * 0.35
-            visible: rootRange.activeTab === "notifications"
-
-            radius: Tokens.rounding.large
-            color: Colours.tPalette.m3surfaceContainerLow
-            clip: true
-
-            CopilotChat {
-                anchors.fill: parent
             }
         }
     }

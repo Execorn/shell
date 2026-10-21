@@ -102,81 +102,9 @@ Item {
                     width: parent.width - Tokens.padding.medium * 2
                     wrapMode: Text.WordWrap
                     textFormat: Text.PlainText
-                    color: Ocr.ocrText ? Colours.palette.m3onSurface : Colours.palette.m3outline
-                    text: Ocr.ocrText ? Ocr.ocrText : qsTr("No text captured. Click above to select screen area.")
+                    color: Ocr.lastError ? Colours.palette.m3error : (Ocr.ocrText ? Colours.palette.m3onSurface : Colours.palette.m3outline)
+                    text: Ocr.lastError ? Ocr.lastError : (Ocr.ocrText ? Ocr.ocrText : qsTr("No text captured. Click above to select screen area."))
                     font: Tokens.font.body.small
-                }
-            }
-
-            SectionHeader {
-                title: qsTr("AI Translation & Explanation")
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.spacing.medium
-
-                StyledText {
-                    text: qsTr("Target Lang:")
-                    color: Colours.palette.m3onSurface
-                    font: Tokens.font.body.small
-                }
-
-                StyledInputField {
-                    id: targetLangInput
-                    Layout.fillWidth: true
-                    placeholderText: qsTr("e.g. Spanish")
-                    text: "Spanish"
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.spacing.medium
-
-                TextButton {
-                    Layout.fillWidth: true
-                    text: qsTr("Translate")
-                    type: ButtonBase.Tonal
-                    disabled: Ocr.ocrText.trim() === ""
-                    onClicked: Ocr.translateText(targetLangInput.text)
-                }
-
-                TextButton {
-                    Layout.fillWidth: true
-                    text: qsTr("Explain")
-                    type: ButtonBase.Tonal
-                    disabled: Ocr.ocrText.trim() === ""
-                    onClicked: Ocr.explainText()
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: Tokens.spacing.small
-                visible: Ocr.translatedText !== "" || Ocr.lastError !== ""
-
-                SectionHeader {
-                    title: qsTr("Result")
-                }
-
-                StyledRect {
-                    Layout.fillWidth: true
-                    implicitHeight: resultTextDisplay.implicitHeight + Tokens.padding.medium * 2
-                    radius: Tokens.rounding.medium
-                    color: Colours.layer(Colours.palette.m3surfaceContainer, 1)
-
-                    StyledText {
-                        id: resultTextDisplay
-                        x: Tokens.padding.medium
-                        y: Tokens.padding.medium
-                        width: parent.width - Tokens.padding.medium * 2
-                        wrapMode: Text.WordWrap
-                        textFormat: Text.PlainText
-                        color: Ocr.lastError ? Colours.palette.m3error : Colours.palette.m3onSurface
-                        text: Ocr.lastError ? Ocr.lastError : Ocr.translatedText
-                        font: Tokens.font.body.small
-                    }
                 }
             }
         }

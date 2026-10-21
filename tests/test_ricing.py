@@ -467,22 +467,7 @@ qmlRegisterType(MockHyprlandToplevel, "Quickshell.Hyprland", 1, 0, "HyprlandTopl
 qmlRegisterType(MockHyprlandEvent, "Quickshell.Hyprland", 1, 0, "HyprlandEvent")
 qmlRegisterType(MockHyprKeyboard, "Quickshell.Hyprland", 1, 0, "HyprKeyboard")
 
-# Mock Ollama and Requests Python interfaces
-class MockOllama(QObject):
-    def __init__(self):
-        super().__init__()
-        self.responses = {}
-        self.requests = []
-
-    @Slot(str, str, result='QVariantMap')
-    def handleRequest(self, url, payload):
-        self.requests.append((url, payload))
-        print(f"MockOllama request url: {url} payload: {payload}")
-        for k, v in self.responses.items():
-            if k in payload or k in url:
-                return v
-        return {"status": 200, "text": '{"message": {"content": "Mock default response"}}'}
-
+# Mock Requests Python interface
 class MockRequests(QObject):
     def __init__(self):
         super().__init__()
@@ -610,7 +595,7 @@ def setup_qml_services():
     if not dest_dir.exists():
         dest_dir.mkdir(parents=True, exist_ok=True)
     
-    files = ["Copilot.qml", "Ocr.qml", "Colours.qml", "Wallpapers.qml", "Weather.qml", "Audio.qml", "Visibilities.qml", "Hypr.qml"]
+    files = ["Ocr.qml", "Colours.qml", "Wallpapers.qml", "Weather.qml", "Audio.qml", "Visibilities.qml", "Hypr.qml"]
     for f in files:
         if f == "Visibilities.qml":
             (dest_dir / f).write_text('''pragma Singleton
@@ -650,7 +635,6 @@ QtObject {
 
     qmldir_content = """module qs.services
 singleton Audio 1.0 Audio.qml
-singleton Copilot 1.0 Copilot.qml
 singleton Ocr 1.0 Ocr.qml
 singleton Colours 1.0 Colours.qml
 singleton Wallpapers 1.0 Wallpapers.qml
@@ -973,10 +957,6 @@ def qml_engine(qapp, mock_pipewire, mock_toaster):
 
 @pytest.fixture
 def ricing_suite(qml_engine, mock_bins):
-    # Setup OllamaMock context property
-    ollama_mock = MockOllama()
-    qml_engine.rootContext().setContextProperty("OllamaMock", ollama_mock)
-    
     # Setup Requests context property
     requests_mock = MockRequests()
     qml_engine.rootContext().setContextProperty("Requests", requests_mock)
@@ -995,47 +975,6 @@ def ricing_suite(qml_engine, mock_bins):
     
     # GlobalConfig and Tokens are already loaded by qml_engine fixture using our overwritten files
     
-    # Setup XMLHttpRequest constructor function dynamically
-    js_constructor = qml_engine.evaluate('''
-    (function(ollamaMock) {
-        var XHR = function() {
-            var self = this;
-            this.readyState = 0;
-            this.status = 0;
-            this.responseText = "";
-            this.headers = {};
-            this.onreadystatechange = null;
-            this.open = function(method, url, async) {
-                self.method = method;
-                self.url = url;
-            };
-            this.setRequestHeader = function(header, value) {
-                self.headers[header] = value;
-            };
-            this.send = function(payload) {
-                var response = ollamaMock.handleRequest(self.url, payload);
-                self.readyState = 4;
-                self.status = response.status;
-                self.responseText = response.text;
-                if (self.onreadystatechange) {
-                    self.onreadystatechange();
-                }
-            };
-        };
-        XHR.UNSENT = 0;
-        XHR.OPENED = 1;
-        XHR.HEADERS_RECEIVED = 2;
-        XHR.LOADING = 3;
-        XHR.DONE = 4;
-        return XHR;
-    })
-    ''')
-    if js_constructor.isError():
-        raise RuntimeError(f"Failed to compile XHR JS constructor: {js_constructor.toString()}")
-        
-    xhr_fn = js_constructor.call([qml_engine.toScriptValue(ollama_mock)])
-    qml_engine.rootContext().setContextProperty("XMLHttpRequest", xhr_fn)
-        
     # Expose Colours service to the context as well
     colours = qml_engine.singletonInstance("qs.services", "Colours")
     qml_engine.rootContext().setContextProperty("Colours", colours)
@@ -1051,11 +990,9 @@ def ricing_suite(qml_engine, mock_bins):
         
     yield {
         "engine": qml_engine,
-        "ollama": ollama_mock,
         "requests": requests_mock,
         "cutils": cutils_mock,
         "quickshell": quickshell_mock,
-        "xhr_fn": xhr_fn, # Prevent garbage collection!
         "hyprland": hyprland_mock,
         "colours": colours
     }
@@ -1517,69 +1454,7 @@ def test_t1_r4_control_center_toggles(ricing_suite):
     assert "wlsunset" in log_content
 
 
-# --- R5: AI Copilot Sidebar ---
-def test_t1_r5_copilot_clear_history(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    call_method(engine, copilot, "clearChat")
-    assert get_property(engine, copilot, "chatHistory").property("count") == 1
-    assert "Caelestia AI Copilot" in get_property(engine, copilot, "chatHistory").get(0)["message"]
-
-def test_t1_r5_copilot_send_message(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    
-    ricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "Hello user!"}}'
-    }
-    
-    call_method(engine, copilot, "sendMessage", "Hi assistant")
-    assert get_property(engine, copilot, "chatHistory").property("count").toVariant() in (2, 3)
-    assert get_property(engine, copilot, "chatHistory").get(1)["message"] == "Hi assistant"
-
-def test_t1_r5_copilot_action_workspace(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    
-    msg = "I will switch to workspace 5.\n```json\n{\n  \"action\": \"workspace\",\n  \"id\": 5\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    log_content = pathlib.Path("/tmp/hyprctl_calls.log").read_text()
-    assert "workspace 5" in log_content
-
-def test_t1_r5_copilot_action_volume(ricing_suite):
-    pipewire = ricing_suite["engine"].rootContext().contextProperty("Pipewire")
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-def test_t1_r5_copilot_action_volume(ricing_suite, qapp):
-    pipewire = ricing_suite["engine"].rootContext().contextProperty("Pipewire")
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    audio = engine.singletonInstance("qs.services", "Audio")
-    
-    sink = MockPwNode(22, "Speakers", "Speakers Output", is_sink=True)
-    pipewire.setProperty("defaultAudioSink", sink)
-    pipewire.add_node(sink)
-    call_method(engine, audio, "syncNodes")
-    qapp.processEvents()
-    
-    msg = "Setting volume to 80%.\n```json\n{\n  \"action\": \"volume\",\n  \"value\": 80\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    
-    sink_val = get_property(engine, audio, "sink")
-    res = call_method(engine, audio, "getStreamVolume", sink_val)
-    assert abs(res.toVariant() - 0.8) < 0.011
-
-def test_t1_r5_copilot_action_exec(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    
-    msg = "Launching terminal.\n```json\n{\n  \"action\": \"exec\",\n  \"command\": \"alacritty\"\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    assert ["alacritty"] in ricing_suite["quickshell"].execs
-
-
-# --- R6: Screen OCR & Translation ---
+# --- R6: Screen OCR ---
 def test_t1_r6_ocr_start_ocr(ricing_suite):
     engine = ricing_suite["engine"]
     ocr = engine.singletonInstance("qs.services", "Ocr")
@@ -1608,32 +1483,6 @@ def test_t1_r6_ocr_capture_success(ricing_suite, qapp):
     
     assert get_property(engine, ocr, "ocrText").toVariant() == "Hello Screen Text"
     assert get_property(engine, ocr, "running").toVariant() is False
-
-def test_t1_r6_ocr_translate(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "Hello")
-    
-    ricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "Bonjour"}}'
-    }
-    
-    call_method(engine, ocr, "translateText", "French")
-    assert get_property(engine, ocr, "translatedText").toVariant() == "Bonjour"
-
-def test_t1_r6_ocr_explain(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "Error 404")
-    
-    ricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "It means file not found."}}'
-    }
-    
-    call_method(engine, ocr, "explainText")
-    assert get_property(engine, ocr, "translatedText").toVariant() == "It means file not found."
 
 def test_t1_r6_ocr_error_handling(ricing_suite, qapp):
     engine = ricing_suite["engine"]
@@ -1861,106 +1710,11 @@ def test_t2_r4_control_center_rapid_toggle(ricing_suite):
     assert cc is not None
 
 
-# --- R5: AI Copilot Sidebar ---
-def test_t2_r5_copilot_malformed_action_json(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    msg = "Executing action:\n```json\n{\n  \"action\": \"volume\",\n  \"value\":\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    assert copilot is not None
-
-def test_t2_r5_copilot_empty_message(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    call_method(engine, copilot, "sendMessage", "")
-    assert get_property(engine, copilot, "chatHistory").property("count") == 1
-
-def test_t2_r5_copilot_unknown_action(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    msg = "```json\n{\n  \"action\": \"play_laser_tag\"\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    assert copilot is not None
-
-def test_t2_r5_copilot_network_timeout(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    pricing_suite = ricing_suite
-    pricing_suite["ollama"].responses["api/chat"] = {
-        "status": 504,
-        "text": "Gateway Timeout"
-    }
-    call_method(engine, copilot, "sendMessage", "Test timeout")
-    assert "Cannot connect to local Ollama server" in get_property(engine, copilot, "lastError").toVariant()
-
-def test_t2_r5_copilot_multiple_actions(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    
-    msg = """```json
-[
-  {"action": "workspace", "id": 8},
-  {"action": "exec", "command": "nemo"}
-]
-```"""
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    log_content = pathlib.Path("/tmp/hyprctl_calls.log").read_text()
-    assert "workspace 8" in log_content
-    assert ["nemo"] in ricing_suite["quickshell"].execs
-
-
-# --- R6: Screen OCR & Translation ---
-def test_t2_r6_ocr_translate_empty(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "")
-    call_method(engine, ocr, "translateText", "German")
-    assert get_property(engine, ocr, "translatedText").toVariant() == ""
-
-def test_t2_r6_ocr_ollama_timeout(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "Translate me")
-    
-    pricing_suite = ricing_suite
-    pricing_suite["ollama"].responses["api/chat"] = {
-        "status": 503,
-        "text": "Service Unavailable"
-    }
-    call_method(engine, ocr, "translateText", "German")
-    assert "Ollama connection error" in get_property(engine, ocr, "lastError").toVariant()
-
-def test_t2_r6_ocr_explain_timeout(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "Explain me")
-    
-    pricing_suite = ricing_suite
-    pricing_suite["ollama"].responses["api/chat"] = {
-        "status": 503,
-        "text": "Service Unavailable"
-    }
-    call_method(engine, ocr, "explainText")
-    assert "Ollama connection error" in get_property(engine, ocr, "lastError").toVariant()
-
-def test_t2_r6_ocr_explain_corrupt(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    set_property(engine, ocr, "ocrText", "Explain me")
-    
-    pricing_suite = ricing_suite
-    pricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": "corrupt json response"
-    }
-    call_method(engine, ocr, "explainText")
-    assert "Explanation failed" in get_property(engine, ocr, "lastError").toVariant()
-
+# --- R6: Screen OCR ---
 def test_t2_r6_ocr_resets(ricing_suite):
     engine = ricing_suite["engine"]
     ocr = engine.singletonInstance("qs.services", "Ocr")
     set_property(engine, ocr, "ocrText", "old")
-    set_property(engine, ocr, "translatedText", "old")
     set_property(engine, ocr, "lastError", "old")
     
     ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()
@@ -1968,60 +1722,12 @@ def test_t2_r6_ocr_resets(ricing_suite):
     
     call_method(engine, ocr, "startOcr")
     assert get_property(engine, ocr, "ocrText").toVariant() == ""
-    assert get_property(engine, ocr, "translatedText").toVariant() == ""
     assert get_property(engine, ocr, "lastError").toVariant() == ""
 
 
 # ==========================================
-# TIER 3 tests (Cross-Feature/Pairwise): >=6 tests
+# TIER 3 tests (Cross-Feature/Pairwise)
 # ==========================================
-
-def test_t3_copilot_volume_triggers_audio(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    audio = engine.singletonInstance("qs.services", "Audio")
-    
-    pipewire = ricing_suite["engine"].rootContext().contextProperty("Pipewire")
-    node = MockPwNode(30, "App", "App Stream", is_sink=True)
-    pipewire.add_node(node)
-    pipewire.set_defaultAudioSink(node)
-    call_method(engine, audio, "syncNodes")
-    
-    msg = "Setting volume to 50%.\n```json\n{\n  \"action\": \"volume\",\n  \"value\": 50\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    assert node._audio._volume == 0.5
-
-def test_t3_copilot_wallpaper_cycles_colours(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    wallpapers = engine.singletonInstance("qs.services", "Wallpapers")
-    
-    set_property(engine, wallpapers, "actualCurrent", "/tmp/wall1.png")
-    
-    msg = "```json\n{\n  \"action\": \"wallpaper\",\n  \"direction\": \"random\"\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    
-    log_content = pathlib.Path("/tmp/caelestia_calls.log").read_text()
-    assert "wallpaper -r" in log_content
-
-def test_t3_ocr_translation_updates_copilot(ricing_suite):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    
-    set_property(engine, ocr, "ocrText", "Warning: disk full")
-    pricing_suite = ricing_suite
-    pricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "Your storage is full."}}'
-    }
-    
-    call_method(engine, ocr, "explainText")
-    
-    expl = get_property(engine, ocr, "translatedText").toVariant()
-    call_method(engine, copilot, "sendMessage", f"OCR result explained as: {expl}. What should I do?")
-    assert get_property(engine, copilot, "chatHistory").property("count").toVariant() in (2, 3)
-    assert "Your storage is full." in get_property(engine, copilot, "chatHistory").get(1)["message"]
 
 def test_t3_weather_geocoding_triggers_theme(ricing_suite):
     req = ricing_suite["requests"]
@@ -2071,57 +1777,8 @@ def test_t3_overview_drag_triggers_colours(ricing_suite, qapp):
 
 
 # ==========================================
-# TIER 4 tests (Real-World Application Scenarios): >=5 tests
+# TIER 4 tests (Real-World Application Scenarios)
 # ==========================================
-
-def test_t4_copilot_wallpaper_color_pipeline(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    wallpapers = engine.singletonInstance("qs.services", "Wallpapers")
-    colours = ricing_suite["colours"]
-    
-    set_property(engine, wallpapers, "actualCurrent", "/tmp/wall1.png")
-    
-    msg = "Change wallpaper to random.\n```json\n{\n  \"action\": \"wallpaper\",\n  \"direction\": \"random\"\n}\n```"
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    
-    call_method(engine, colours, "load", '{"name":"dynamic","flavour":"mocha","mode":"dark","colours":{"primaryContainer":"ff00ff"}}', False)
-    
-    assert get_property(engine, colours, "scheme").toVariant() == "dynamic"
-    palette = get_property(engine, colours, "palette")
-    res = get_property(engine, palette, "m3primaryContainer")
-    assert res.toVariant() == "#ff00ff"
-
-def test_t4_ocr_translate_explain_workflow(ricing_suite, qapp):
-    engine = ricing_suite["engine"]
-    ocr = engine.singletonInstance("qs.services", "Ocr")
-    
-    pathlib.Path("/tmp/mock_ocr_text.txt").write_text("Hello world")
-    call_method(engine, ocr, "startOcr")
-    qapp.processEvents()
-    
-    screenshotProcess = get_property(engine, ocr, "screenshotProcess").toQObject()
-    screenshotProcess.setProperty("running", True)
-    qapp.processEvents()
-    
-    ocrProcess = get_property(engine, ocr, "ocrProcess").toQObject()
-    ocrProcess.setProperty("running", True)
-    qapp.processEvents()
-    
-    ricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "Hola mundo"}}'
-    }
-    call_method(engine, ocr, "translateText", "Spanish")
-    
-    ricing_suite["ollama"].responses["api/chat"] = {
-        "status": 200,
-        "text": '{"message": {"content": "A standard greeting program."}}'
-    }
-    call_method(engine, ocr, "explainText")
-    
-    assert get_property(engine, ocr, "ocrText").toVariant() == "Hello world"
-    assert get_property(engine, ocr, "translatedText").toVariant() == "A standard greeting program."
 
 def test_t4_overview_drag_mixer_control(ricing_suite):
     engine = ricing_suite["engine"]
@@ -2167,36 +1824,8 @@ def test_t4_system_startup_weather_audio(ricing_suite, qapp):
     res = get_property(engine, audio, "sink")
     assert res.toQObject().property("id") == 100
 
-def test_t4_copilot_mic_mute_launcher(ricing_suite):
-    engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    visibilities = engine.singletonInstance("qs.services", "Visibilities")
-    pipewire = ricing_suite["engine"].rootContext().contextProperty("Pipewire")
-    audio = engine.singletonInstance("qs.services", "Audio")
-    
-    source = MockPwNode(110, "Mic Device", "Input Mic", is_stream=True)
-    pipewire.set_defaultAudioSource(source)
-    pipewire.add_node(source)
-    call_method(engine, audio, "syncNodes")
-    
-    msg = """Sure! Mutting mic and opening launcher.
-```json
-[
-  {"action": "mute", "type": "mic", "state": true},
-  {"action": "drawer", "name": "launcher", "state": true}
-]
-```"""
-    
-    call_method(engine, copilot, "executeActionsFromText", msg)
-    
-    assert source._audio._muted is True
-    active_vis = get_property(engine, visibilities, "activeVis")
-    assert get_property(engine, active_vis, "launcher").toVariant() is True
-
 def test_load_all_services(ricing_suite):
     engine = ricing_suite["engine"]
-    copilot = engine.singletonInstance("qs.services", "Copilot")
-    assert copilot is not None
     ocr = engine.singletonInstance("qs.services", "Ocr")
     assert ocr is not None
     colours = engine.singletonInstance("qs.services", "Colours")
