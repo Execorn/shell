@@ -310,8 +310,6 @@ except Exception:
         const bestSinkNode = physicalSinks.find(s => isNodeValid(s) && s.name === bestSinkName);
         root.physicalDriverId = activeNode ? activeNode.id : (bestSinkNode ? bestSinkNode.id : -1);
 
-        const sinkMapStr = sinks.filter(isNodeValid).map(n => n.id + ":" + (n.name || "")).join(", ");
-        console.log("[Audio.qml debug] updateActiveSink called. physicalDriverId:", root.physicalDriverId, "prefPhysicalSink:", preferredPhysicalSink, "override:", root.manualSinkOverride, "sinks:", sinkMapStr);
         let resolvedSink = null;
         const dSink = Pipewire ? Pipewire.defaultAudioSink : null;
         if (isNodeValid(dSink)) {
@@ -362,7 +360,6 @@ except Exception:
             }
         }
         if (root.sink !== resolvedSink) {
-            console.log("[Audio.qml debug] Updating root.sink from", isNodeValid(root.sink) ? root.sink.name : "none", "to", isNodeValid(resolvedSink) ? resolvedSink.name : "none");
             root.sink = resolvedSink;
         }
     }
@@ -420,7 +417,6 @@ except Exception:
         }
 
         const activeNode = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
-        console.log("[Audio.qml debug] updateActiveSource called. prefPhysicalSource:", preferredPhysicalSource, "override:", root.manualSourceOverride);
 
         if (activeNode && preferredPhysicalSource !== "") {
             if (preferredPhysicalSource !== lastRoutedPhysicalSource) {
@@ -481,14 +477,9 @@ except Exception:
         return (stream.properties && stream.properties["application.name"]) || stream.description || stream.name || qsTr("Unknown Application");
     }
 
-    onVolumeChanged: {
-        console.log("[Audio.qml debug] Volume changed:", volume, "Muted:", muted, "Sink:", isNodeValid(sink) ? sink.name : "none", "Sink.audio:", isNodeValid(sink) ? sink.audio : "none", "Sink.audio.volume:", isNodeValid(sink) ? sink.audio?.volume : "none");
-    }
-
     onSinkChanged: {
         root.customVolume = -1;
         root.customMuted = -1;
-        console.log("[Audio.qml debug] Sink changed:", isNodeValid(sink) ? sink.name : "none", "description:", isNodeValid(sink) ? sink.description : "none", "audio:", isNodeValid(sink) ? sink.audio : "none", "properties:", isNodeValid(sink) ? JSON.stringify(sink.properties) : "none");
         if (!isNodeValid(sink))
             return;
 
@@ -502,7 +493,6 @@ except Exception:
     }
 
     onSourceChanged: {
-        console.log("[Audio.qml debug] Source changed:", isNodeValid(source) ? source.name : "none", "description:", isNodeValid(source) ? source.description : "none");
         if (!isNodeValid(source))
             return;
 
@@ -516,7 +506,6 @@ except Exception:
 
     function syncNodes(): void {
         if (!Pipewire || !Pipewire.nodes) return;
-        console.log("[JS LOG] syncNodes called. Pipewire.nodes.values length:", Pipewire.nodes.values.length, "values:", Pipewire.nodes.values);
 
         const newSinks = [];
         const newSources = [];
@@ -700,7 +689,6 @@ except Exception:
         }
 
         function updateVolume(volStr: string, mutStr: string): void {
-            console.log("[Audio.qml debug] IPC updateVolume called. volStr:", volStr, "mutStr:", mutStr);
             const vol = parseFloat(volStr);
             const mut = (mutStr === "true" || mutStr === "1");
             if (!isNaN(vol)) {

@@ -51,7 +51,6 @@ Singleton {
                 if (!text.trim()) return;
                 try {
                     const presetList = JSON.parse(text);
-                    console.log("[EQs.qml debug] Parsed presets count:", presetList.length);
                     
                     const mapped = presetList.map(item => {
                         return {
@@ -124,8 +123,6 @@ Singleton {
     function query(search: string): var {
         const actionPrefix = GlobalConfig.launcher.actionPrefix; // e.g. ">"
         const cleanSearch = search.trim().replace(/\s+/g, " ");
-        
-        console.log("[EQs.qml debug] query called with search:", search, "cleanSearch:", cleanSearch, "presetsList length:", presetsList.length);
         
         const presets = root.presetsList;
         

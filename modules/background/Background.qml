@@ -9,7 +9,10 @@ import qs.components.containers
 import qs.services
 
 Variants {
-    model: Screens.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
+    model: Screens.screens.filter(s => {
+        const cfg = GlobalConfig.forScreen(s.name).background;
+        return cfg.enabled && (cfg.wallpaperEnabled || cfg.desktopClock.enabled || cfg.visualiser.enabled);
+    })
 
     StyledWindow {
         id: win

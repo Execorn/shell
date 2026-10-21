@@ -5,7 +5,6 @@
 //@ pragma DefaultEnv QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
 //@ pragma DefaultEnv QML_DISABLE_DISK_CACHE=0
 //@ pragma DefaultEnv QT_QUICK_BACKEND=opengl
-//@ pragma DefaultEnv QSG_INFO=1
 
 import QtQuick
 import Quickshell

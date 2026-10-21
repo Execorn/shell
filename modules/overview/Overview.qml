@@ -108,14 +108,12 @@ Scope {
 
                             Repeater {
                                 model: 10 // Workspaces 1-10
-                                Component.onCompleted: console.log("REPEATER completed, count:", count)
 
                                 delegate: Rectangle {
                                     id: card
                                     objectName: "workspaceCard"
                                     required property int index
                                     readonly property int wsId: index + 1
-                                    Component.onCompleted: console.log("CARD delegate completed, wsId:", wsId)
                                     width: grid.cardWidth
                                     height: grid.cardHeight
 
