@@ -100,16 +100,55 @@ Item {
         asynchronous: true
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                monitor: root.monitor
-                visibilities: root.visibilities
-                volume: root.volume
-                muted: root.muted
-                sourceVolume: root.sourceVolume
-                sourceMuted: root.sourceMuted
-                brightness: root.brightness
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    monitor: root.monitor,
+                    visibilities: root.visibilities,
+                    volume: root.volume,
+                    muted: root.muted,
+                    sourceVolume: root.sourceVolume,
+                    sourceMuted: root.sourceMuted,
+                    brightness: root.brightness
+                });
+            } else {
+                source = "";
             }
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "volume"
+            value: root.volume
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "muted"
+            value: root.muted
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "sourceVolume"
+            value: root.sourceVolume
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "sourceMuted"
+            value: root.sourceMuted
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "brightness"
+            value: root.brightness
         }
     }
 }

@@ -36,13 +36,24 @@ Item {
 
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                implicitWidth: Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins
-                props: root.props
-                visibilities: root.visibilities
-                utilitiesProps: root.utilitiesProps
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    implicitWidth: Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins,
+                    props: root.props,
+                    visibilities: root.visibilities,
+                    utilitiesProps: root.utilitiesProps
+                });
+            } else {
+                source = "";
             }
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "implicitWidth"
+            value: root.Tokens.sizes.sidebar.width - content.anchors.leftMargin - content.anchors.margins
         }
     }
 }

@@ -9,10 +9,11 @@ StackView {
 
     required property NexusState nState
     default property list<Component> pages
+    property list<string> pageUrls
     readonly property int animMovement: Tokens.padding.extraExtraLarge * 2
 
     function openSubPage(idx: int, immediate: bool): void {
-        const page = pages[idx];
+        const page = pages[idx] ?? (pageUrls[idx] ? Qt.resolvedUrl("../" + pageUrls[idx]) : null);
         if (page) {
             push(page, {
                 nState

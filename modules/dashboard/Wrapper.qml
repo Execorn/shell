@@ -27,7 +27,7 @@ Item {
         }
     }
 
-    readonly property real nonAnimHeight: (content.item as Content)?.nonAnimHeight ?? 0
+    readonly property real nonAnimHeight: content.item?.nonAnimHeight ?? 0 // qmllint disable missing-property
     readonly property bool shouldBeActive: visibilities.dashboard && Config.dashboard.enabled
     property real offsetScale: shouldBeActive ? 0 : 1
 
@@ -49,11 +49,15 @@ Item {
 
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                visibilities: root.visibilities
-                dashState: root.dashState
-                facePicker: root.facePicker
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    visibilities: root.visibilities,
+                    dashState: root.dashState,
+                    facePicker: root.facePicker
+                });
+            } else {
+                source = "";
             }
         }
     }

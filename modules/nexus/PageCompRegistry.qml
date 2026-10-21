@@ -1,10 +1,9 @@
-pragma Singleton
-
 import QtQuick
 import QtQuick.Layouts
 import Caelestia.Config
 import qs.components
 import qs.services
+import qs.modules.nexus
 import qs.modules.nexus.common
 import qs.modules.nexus.pages
 import qs.modules.nexus.pages.apps
@@ -22,173 +21,121 @@ QtObject {
     readonly property list<Component> pageComps: [
         // Appearance
         Component {
-            // Wallpaper & style
             StackPage {
-                Component {
-                    WallpaperAndStyle {}
-                }
-                Component {
-                    WallpaperSelect {}
-                }
-                Component {
-                    WallpaperCategory {}
-                }
-                Component {
-                    ColourSelect {}
-                }
+                pageUrls: [
+                    "pages/WallpaperAndStyle.qml",
+                    "pages/wallandstyle/WallpaperSelect.qml",
+                    "pages/wallandstyle/WallpaperCategory.qml",
+                    "pages/wallandstyle/ColourSelect.qml"
+                ]
             }
         },
 
         // Connectivity
         Component {
-            // Display
             StackPage {
-                Component {
-                    DisplayPage {}
-                }
+                pageUrls: [
+                    "pages/DisplayPage.qml"
+                ]
             }
         },
         Component {
-            // Network
             StackPage {
-                Component {
-                    NetworkPage {}
-                }
-                Component {
-                    EthernetDetailPage {}
-                }
+                pageUrls: [
+                    "pages/NetworkPage.qml",
+                    "pages/network/EthernetDetailPage.qml"
+                ]
             }
         },
         Component {
-            // Bluetooth
             StackPage {
-                Component {
-                    BluetoothPage {}
-                }
-                Component {
-                    BtDeviceInfo {}
-                }
-                Component {
-                    BluetoothPairing {}
-                }
+                pageUrls: [
+                    "pages/BluetoothPage.qml",
+                    "pages/bluetooth/BtDeviceInfo.qml",
+                    "pages/bluetooth/BluetoothPairing.qml"
+                ]
             }
         },
         Component {
-            // Audio
             StackPage {
-                Component {
-                    AudioPage {}
-                }
-                Component {
-                    AppVolumes {}
-                }
+                pageUrls: [
+                    "pages/AudioPage.qml",
+                    "pages/audio/AppVolumes.qml"
+                ]
             }
         },
 
         // System
         Component {
-            // Updates
             StackPage {
-                Component {
-                    UpdatesPage {}
-                }
+                pageUrls: [
+                    "pages/UpdatesPage.qml"
+                ]
             }
         },
         Component {
-            // Plugins
             StackPage {
-                Component {
-                    PluginsPage {}
-                }
+                pageUrls: [
+                    "pages/PluginsPage.qml"
+                ]
             }
         },
 
         // Shell
         Component {
-            // Panels
             StackPage {
-                Component {
-                    PanelsPage {}
-                }
-                Component {
-                    DashboardPanel {}
-                }
-                Component {
-                    TaskbarPanel {}
-                }
-                Component {
-                    LauncherPanel {}
-                }
-                Component {
-                    SidebarPanel {}
-                }
-
-                // Taskbar component sub-pages
-                Component {
-                    BarWorkspaces {}
-                }
-                Component {
-                    BarActiveWindow {}
-                }
-                Component {
-                    BarTray {}
-                }
-                Component {
-                    BarStatusIcons {}
-                }
-                Component {
-                    BarClock {}
-                }
+                pageUrls: [
+                    "pages/PanelsPage.qml",
+                    "pages/panels/DashboardPanel.qml",
+                    "pages/panels/TaskbarPanel.qml",
+                    "pages/panels/LauncherPanel.qml",
+                    "pages/panels/SidebarPanel.qml",
+                    "pages/panels/taskbar/BarWorkspaces.qml",
+                    "pages/panels/taskbar/BarActiveWindow.qml",
+                    "pages/panels/taskbar/BarTray.qml",
+                    "pages/panels/taskbar/BarStatusIcons.qml",
+                    "pages/panels/taskbar/BarClock.qml"
+                ]
             }
         },
         Component {
-            // Apps
             StackPage {
-                Component {
-                    AppsPage {}
-                }
-                Component {
-                    AllApps {}
-                }
-                Component {
-                    AppInfo {}
-                }
+                pageUrls: [
+                    "pages/AppsPage.qml",
+                    "pages/apps/AllApps.qml",
+                    "pages/apps/AppInfo.qml"
+                ]
             }
         },
         Component {
-            // Services
             StackPage {
-                Component {
-                    ServicesPage {}
-                }
-                Component {
-                    NotificationsPage {}
-                }
+                pageUrls: [
+                    "pages/ServicesPage.qml",
+                    "pages/services/NotificationsPage.qml"
+                ]
             }
         },
         Component {
-            // Language & region
             StackPage {
-                Component {
-                    LanguageAndRegion {}
-                }
+                pageUrls: [
+                    "pages/LanguageAndRegion.qml"
+                ]
             }
         },
         Component {
-            // System paths
             StackPage {
-                Component {
-                    PathsPage {}
-                }
+                pageUrls: [
+                    "pages/PathsPage.qml"
+                ]
             }
         },
 
         // About
         Component {
             StackPage {
-                Component {
-                    AboutPage {}
-                }
+                pageUrls: [
+                    "pages/AboutPage.qml"
+                ]
             }
         }
     ]

@@ -48,12 +48,23 @@ Item {
 
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                visibilities: root.visibilities
-                panels: root.panels
-                maxHeight: root.maxHeight
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    visibilities: root.visibilities,
+                    panels: root.panels,
+                    maxHeight: root.maxHeight
+                });
+            } else {
+                source = "";
             }
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "maxHeight"
+            value: root.maxHeight
         }
     }
 }

@@ -26,7 +26,7 @@ Item {
     }
     readonly property bool shouldBeActive: visibilities.sidebar || (visibilities.utilities && Config.utilities.enabled && !(visibilities.session && Config.session.enabled))
     readonly property real totalPadding: content.anchors.margins + CUtils.clamp(content.anchors.margins - Config.border.thickness, 0, content.anchors.margins)
-    readonly property real nonAnimHeight: ((content.item as Content)?.nonAnimHeight ?? 0) + totalPadding
+    readonly property real nonAnimHeight: (content.item?.nonAnimHeight ?? 0) + totalPadding // qmllint disable missing-property
     property real offsetScale: shouldBeActive ? 0 : 1
     property real sidebarLerp
 
@@ -80,14 +80,32 @@ Item {
         asynchronous: true
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                implicitWidth: root.implicitWidth - root.totalPadding
-                props: root.props
-                visibilities: root.visibilities
-                popouts: root.popouts
-                deformMatrix: root.deformMatrix
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    implicitWidth: root.implicitWidth - root.totalPadding,
+                    props: root.props,
+                    visibilities: root.visibilities,
+                    popouts: root.popouts,
+                    deformMatrix: root.deformMatrix
+                });
+            } else {
+                source = "";
             }
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "implicitWidth"
+            value: root.implicitWidth - root.totalPadding
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "deformMatrix"
+            value: root.deformMatrix
         }
     }
 }

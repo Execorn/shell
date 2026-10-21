@@ -39,9 +39,13 @@ Item {
         anchors.fill: parent
         active: root.shouldBeActive || root.visible
 
-        sourceComponent: Component {
-            Content {
-                visibilities: root.visibilities
+        onActiveChanged: {
+            if (active) {
+                setSource("Content.qml", {
+                    visibilities: root.visibilities
+                });
+            } else {
+                source = "";
             }
         }
     }

@@ -16,7 +16,7 @@ Item {
         if (currentItem)
             currentItem.destroy();
 
-        const comp = PageCompRegistry.pageComps[idx] ?? PageCompRegistry.placeholderComp;
+        const comp = registry.pageComps[idx] ?? registry.placeholderComp;
         const incubator = comp.incubateObject(container, {
             nState
         });
@@ -33,6 +33,10 @@ Item {
                 if (status === Component.Ready)
                     attach();
             };
+    }
+
+    PageCompRegistry {
+        id: registry
     }
 
     Item {

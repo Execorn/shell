@@ -22,7 +22,7 @@ Item {
 
     readonly property real nonAnimWidth: children.find(c => c.shouldBeActive)?.implicitWidth ?? content.implicitWidth
     readonly property real nonAnimHeight: children.find(c => c.shouldBeActive)?.implicitHeight ?? content.implicitHeight
-    readonly property Item current: (content.item as Content)?.current ?? null
+    readonly property Item current: content.item?.current ?? null // qmllint disable missing-property
     readonly property bool isDetached: detachedMode.length > 0
 
     property alias currentName: popoutState.currentName
@@ -68,7 +68,7 @@ Item {
     Keys.onEscapePressed: {
         // Forward escape to password popout if active, otherwise close
         if (currentName === "wirelesspassword" && content.item) {
-            const passwordPopout = (content.item as Content)?.children.find(c => c.name === "wirelesspassword");
+            const passwordPopout = (content.item as Item)?.children.find(c => c.name === "wirelesspassword"); // qmllint disable missing-property
             if (passwordPopout && passwordPopout.item) {
                 passwordPopout.item.closeDialog();
                 return;
@@ -110,10 +110,11 @@ Item {
         shouldBeActive: root.hasCurrent && !root.detachedMode
         anchors.fill: parent
 
-        sourceComponent: Component {
-            Content {
-                popouts: popoutState
-            }
+        onActiveChanged: {
+            if (active)
+                setSource("Content.qml", { popouts: popoutState });
+            else
+                source = "";
         }
     }
 
@@ -123,11 +124,18 @@ Item {
         shouldBeActive: root.detachedMode === "winfo"
         anchors.centerIn: parent
 
-        sourceComponent: Component {
-            WindowInfo {
-                screen: root.screen
-                client: Hypr.activeToplevel
-            }
+        onActiveChanged: {
+            if (active)
+                setSource("../../windowinfo/WindowInfo.qml", { screen: root.screen, client: Hypr.activeToplevel });
+            else
+                source = "";
+        }
+
+        Binding {
+            when: winfo.item !== null
+            target: winfo.item
+            property: "client"
+            value: Hypr.activeToplevel
         }
     }
 
@@ -137,20 +145,31 @@ Item {
         shouldBeActive: root.detachedMode === "any"
         anchors.centerIn: parent
 
-        sourceComponent: StyledClippingRect {
-            radius: Tokens.rounding.extraLarge
-            implicitWidth: nexusInner.implicitWidth
-            implicitHeight: nexusInner.implicitHeight
-
-            Nexus {
-                id: nexusInner
-
-                anchors.fill: parent
-                nState.screen: root.screen
-                nState.animatingContainer: nexus.opacity < 1
-                nState.currentPageIdx: ["appearance", "network", "bluetooth", "audio"].indexOf(root.queuedMode)
-                onClose: root.close()
+        onActiveChanged: {
+            if (active) {
+                setSource("../../nexus/DetachedNexus.qml", {
+                    screen: root.screen,
+                    animatingContainer: nexus.opacity < 1,
+                    initPageIdx: ["appearance", "network", "bluetooth", "audio"].indexOf(root.queuedMode)
+                });
+            } else {
+                source = "";
             }
+        }
+
+        Binding {
+            when: nexus.item !== null
+            target: nexus.item
+            property: "animatingContainer"
+            value: nexus.opacity < 1
+        }
+
+        Connections {
+            function onClose(): void {
+                root.close();
+            }
+
+            target: nexus.item
         }
     }
 
