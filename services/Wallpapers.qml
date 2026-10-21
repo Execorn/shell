@@ -125,11 +125,11 @@ Searcher {
         }
     }
 
-    function setWallpaper(path: string, effect: string): void {
+    function setWallpaper(path: string, effect = ""): void {
         previewPath = path;
         actualCurrent = path;
         const helperArgs = ["python3", Quickshell.shellPath("scripts/wwal-helper.py"), "set", path];
-        if (effect)
+        if (effect && effect !== "undefined")
             helperArgs.push(effect);
         Quickshell.execDetached(helperArgs);
         Quickshell.execDetached(["python3", Quickshell.shellPath("scripts/apply-theme.py"), "--wallpaper", path, "--no-wwal"]);

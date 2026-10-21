@@ -5,6 +5,7 @@
 #include <qfile.h>
 #include <qfileinfo.h>
 #include <qimage.h>
+#include <qimagereader.h>
 #include <qloggingcategory.h>
 #include <qmutex.h>
 #include <qpainter.h>
@@ -101,12 +102,6 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
         return;
     }
 
-    QImage image(sourcePath);
-    if (image.isNull()) {
-        qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
-        return;
-    }
-
     Qt::AspectRatioMode scaleMode;
     switch (fillMode) {
     case FillMode::Crop:
@@ -118,6 +113,19 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
     case FillMode::Stretch:
         scaleMode = Qt::IgnoreAspectRatio;
         break;
+    }
+
+    QImageReader reader(sourcePath);
+    if (size.isValid()) {
+        const QSize srcSize = reader.size();
+        if (srcSize.isValid() && (srcSize.width() > size.width() * 2 || srcSize.height() > size.height() * 2)) {
+            reader.setScaledSize(srcSize.scaled(size * 2, scaleMode));
+        }
+    }
+    QImage image = reader.read();
+    if (image.isNull()) {
+        qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
+        return;
     }
 
     image.convertTo(QImage::Format_ARGB32);

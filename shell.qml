@@ -22,6 +22,7 @@ ShellRoot {
 
     property var pluginManager: PluginManager
     property var hypr: Hypr
+    property var wallpapers: Wallpapers
     property var ocr: Ocr
     property var players: Players
     property var notifs: Notifs

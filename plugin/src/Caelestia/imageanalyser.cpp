@@ -4,6 +4,7 @@
 #include <QtQuick/qquickitemgrabresult.h>
 #include <qfuturewatcher.h>
 #include <qimage.h>
+#include <qimagereader.h>
 #include <qloggingcategory.h>
 #include <qquickwindow.h>
 #include <array>
@@ -148,8 +149,14 @@ void ImageAnalyser::update() {
         });
     } else {
         m_futureWatcher->setFuture(QtConcurrent::run([=, this](QPromise<AnalyseResult>& promise) {
-            const QImage image(m_source);
-            analyse(promise, image, m_rescaleSize);
+            QImageReader reader(m_source);
+            if (m_rescaleSize > 0) {
+                const QSize sz = reader.size();
+                if (sz.isValid() && (sz.width() > m_rescaleSize || sz.height() > m_rescaleSize)) {
+                    reader.setScaledSize(sz.scaled(m_rescaleSize, m_rescaleSize, Qt::KeepAspectRatio));
+                }
+            }
+            analyse(promise, reader.read(), m_rescaleSize);
         }));
     }
 }

@@ -130,7 +130,7 @@ Singleton {
     ImageAnalyser {
         id: analyser
 
-        source: Wallpapers.current
+        source: root.transparency.enabled ? Wallpapers.current : ""
     }
 
     Timer {

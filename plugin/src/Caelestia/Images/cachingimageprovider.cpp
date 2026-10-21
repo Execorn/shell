@@ -89,14 +89,27 @@ private:
             }
         }
 
-        // Schedule cache job (this call will return the original image, but later ones will use cache)
         ImageCacher::instance()->schedule(path, cachePath, size, m_fillMode);
 
-        m_image = QImage(path);
+        Qt::AspectRatioMode scaleMode = Qt::IgnoreAspectRatio;
+        if (m_fillMode == ImageCacher::FillMode::Crop) {
+            scaleMode = Qt::KeepAspectRatioByExpanding;
+        } else if (m_fillMode == ImageCacher::FillMode::Fit) {
+            scaleMode = Qt::KeepAspectRatio;
+        }
+
+        QImageReader reader(path);
+        const QSize srcSize = reader.size();
+        if (srcSize.isValid() && (srcSize.width() > size.width() * 2 || srcSize.height() > size.height() * 2)) {
+            reader.setScaledSize(srcSize.scaled(size * 2, scaleMode));
+        }
+        m_image = reader.read();
         if (m_image.isNull()) {
             m_error = QStringLiteral("Failed to decode source: ") + path;
             qCWarning(lcCProv).noquote() << m_error;
+            return;
         }
+        m_image = m_image.scaled(size, scaleMode, Qt::SmoothTransformation);
     }
 
     QString m_id;

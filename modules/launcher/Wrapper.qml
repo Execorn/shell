@@ -4,7 +4,6 @@ import QtQuick
 import Quickshell
 import Caelestia.Config
 import qs.components
-import qs.modules.launcher.services
 
 Item {
     id: root
@@ -36,8 +35,6 @@ Item {
     implicitHeight: content.implicitHeight
     implicitWidth: content.implicitWidth || 630 // Hard coded fallback for first open
     opacity: 1 - offsetScale
-
-    Component.onCompleted: Qt.callLater(() => Apps) // Load apps on init
 
     Behavior on offsetScale {
         Anim {}

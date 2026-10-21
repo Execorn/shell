@@ -298,10 +298,16 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
 
         if (filter == Images) {
             QStringList extraNameFilters = nameFilters;
-            const auto formats = QImageReader::supportedImageFormats();
-            for (const auto& format : formats) {
-                extraNameFilters << "*." + format;
-            }
+            static const QStringList s_imageGlobFilters = {
+                QStringLiteral("*.jpg"),  QStringLiteral("*.jpeg"), QStringLiteral("*.png"),
+                QStringLiteral("*.webp"), QStringLiteral("*.avif"), QStringLiteral("*.jxl"),
+                QStringLiteral("*.bmp"),  QStringLiteral("*.gif"),  QStringLiteral("*.svg"),
+                QStringLiteral("*.tiff"), QStringLiteral("*.tif"),  QStringLiteral("*.heic"),
+                QStringLiteral("*.heif"), QStringLiteral("*.ico"),  QStringLiteral("*.pnm"),
+                QStringLiteral("*.ppm"),  QStringLiteral("*.pgm"),  QStringLiteral("*.pbm"),
+                QStringLiteral("*.xbm"),  QStringLiteral("*.xpm"),  QStringLiteral("*.tga"),
+            };
+            extraNameFilters.append(s_imageGlobFilters);
 
             QDir::Filters filters = QDir::Files;
             if (showHidden) {
@@ -337,16 +343,7 @@ void FileSystemModel::updateEntriesForDir(const QString& dir) {
                 return;
             }
 
-            QString path = iter->next();
-
-            if (filter == Images) {
-                QImageReader reader(path);
-                if (!reader.canRead()) {
-                    continue;
-                }
-            }
-
-            newPaths.insert(path);
+            newPaths.insert(iter->next());
         }
 
         if (promise.isCanceled()) {

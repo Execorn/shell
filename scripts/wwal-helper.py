@@ -114,7 +114,7 @@ def handle_scroll(path):
 
 def handle_set(path, explicit_effect=None):
     cfg = load_config()
-    if explicit_effect:
+    if explicit_effect and explicit_effect != "undefined":
         set_effect = explicit_effect
     else:
         set_effect = cfg.get("setEffect", "fade")
