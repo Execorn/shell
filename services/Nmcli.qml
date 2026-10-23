@@ -195,6 +195,7 @@ Singleton {
             if (index >= 0) {
                 activeProcesses.splice(index, 1);
             }
+            Qt.callLater(() => proc.destroy());
         });
 
         Qt.callLater(() => {
@@ -1217,6 +1218,8 @@ Singleton {
         return details;
     }
 
+    signal networkMonitorEvent()
+
     function refreshOnConnectionChange(): void {
         getNetworks(networks => {
             const newActive = root.active;
@@ -1246,8 +1249,24 @@ Singleton {
                 root.ethernetDeviceDetails = null;
             }
 
-            getWirelessInterfaces(() => {});
-            getEthernetInterfaces(() => {
+            getDeviceStatus(output => {
+                root.wirelessInterfaces = parseDeviceStatusOutput(output, root.deviceTypeWifi);
+                const ethIfaces = parseDeviceStatusOutput(output, root.deviceTypeEthernet);
+                const ethDevices = ethIfaces.map(iface => ({
+                            interface: iface.device,
+                            type: iface.type,
+                            state: iface.state,
+                            connection: iface.connection,
+                            connected: isConnectedState(iface.state),
+                            ipAddress: "",
+                            gateway: "",
+                            dns: [],
+                            subnet: "",
+                            macAddress: "",
+                            speed: ""
+                        }));
+                root.ethernetInterfaces = ethIfaces;
+                syncEthernetDevices(ethDevices);
                 if (root.activeEthernet && root.activeEthernet.connected) {
                     Qt.callLater(() => {
                         getEthernetDeviceDetails(root.activeEthernet.iface, () => {});
@@ -1494,6 +1513,16 @@ Singleton {
         onExited: root.getNetworks() // qmllint disable signal-handler-parameters
     }
 
+    Timer {
+        id: monitorDebounceTimer
+
+        interval: 250
+        onTriggered: {
+            root.refreshOnConnectionChange();
+            root.networkMonitorEvent();
+        }
+    }
+
     Process {
         id: monitorProc
 
@@ -1504,7 +1533,7 @@ Singleton {
                 LC_ALL: "C.UTF-8"
             })
         stdout: SplitParser {
-            onRead: root.refreshOnConnectionChange()
+            onRead: monitorDebounceTimer.restart()
         }
         onExited: monitorRestartTimer.start() // qmllint disable signal-handler-parameters
     }

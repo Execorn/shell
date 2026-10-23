@@ -19,9 +19,9 @@ QtObject {
     property string timeStr: qsTr("now")
 
     readonly property Timer timeStrTimer: Timer {
-        running: !notif.closed
+        running: !notif.closed && (notif.popup || Visibilities.bars.size > 0)
         repeat: true
-        interval: 5000
+        interval: notif.popup ? 5000 : 60000
         onTriggered: notif.updateTimeStr()
     }
 
@@ -54,6 +54,8 @@ QtObject {
     }
 
     readonly property bool hasFullscreen: {
+        if (!notif.popup)
+            return false;
         const monitor = Hypr.focusedMonitor;
         const specialName = monitor?.lastIpcObject?.specialWorkspace?.name;
         if (specialName) {
@@ -64,7 +66,7 @@ QtObject {
     }
 
     readonly property Timer timer: Timer {
-        running: true
+        running: notif.popup
         interval: notif.expireTimeout > 0 ? notif.expireTimeout : notif.hasFullscreen ? GlobalConfig.notifs.fullscreenExpireTimeout : GlobalConfig.notifs.defaultExpireTimeout
         onTriggered: {
             // Always expire if the active workspace has a fullscreen window

@@ -8,10 +8,11 @@ Image {
     property string path
 
     asynchronous: true
+    cache: false
     fillMode: Image.PreserveAspectCrop
-    source: IUtils.urlForPath(path, fillMode)
+    source: (path && width > 0 && height > 0) ? IUtils.urlForPath(path, fillMode) : ""
     sourceSize: {
         const dpr = (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1;
-        return Qt.size(width * dpr, height * dpr);
+        return Qt.size(Math.max(1, Math.ceil(width * dpr)), Math.max(1, Math.ceil(height * dpr)));
     }
 }

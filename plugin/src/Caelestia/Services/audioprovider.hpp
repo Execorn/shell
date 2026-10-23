@@ -11,9 +11,9 @@ class AudioProcessor : public QObject {
 
 public:
     explicit AudioProcessor(QObject* parent = nullptr);
-    ~AudioProcessor();
+    ~AudioProcessor() override;
 
-    void init();
+    virtual void init();
 
 public slots:
     void start();

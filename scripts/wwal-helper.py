@@ -44,8 +44,15 @@ def load_config():
 
 def is_daemon_running():
     try:
-        res = subprocess.run(["pgrep", "-x", "wwald"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return res.returncode == 0
+        for pid in os.listdir("/proc"):
+            if pid.isdigit():
+                try:
+                    with open(f"/proc/{pid}/comm", "rb") as f:
+                        if f.read() == b"wwald\n":
+                            return True
+                except OSError:
+                    continue
+        return False
     except Exception:
         return False
 

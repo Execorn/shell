@@ -262,7 +262,7 @@ def main():
             os.makedirs(os.path.dirname(hypr_conf_path), exist_ok=True)
             with open(hypr_conf_path, "w") as f:
                 for k, v in fallback_scheme["colours"].items():
-                    f.write(f"${k} = rgba({v}ff)\n")
+                    f.write(f"${k} = {v}\n")
 
         except Exception as e:
             print(f"Error during fallback extraction: {e}", file=sys.stderr)
@@ -311,8 +311,14 @@ def main():
     if shutil.which("hyprctl"):
         print("Injecting colors into Hyprland active instances...")
         try:
-            subprocess.run(["hyprctl", "keyword", "general:col.active_border", f"rgba({primary}e6)"], check=True)
-            subprocess.run(["hyprctl", "keyword", "general:col.inactive_border", f"rgba({onSurfaceVariant}11)"], check=True)
+            subprocess.run(
+                [
+                    "hyprctl",
+                    "--batch",
+                    f"keyword general:col.active_border rgba({primary}e6) ; keyword general:col.inactive_border rgba({onSurfaceVariant}11)",
+                ],
+                check=True,
+            )
         except Exception as e:
             print(f"Warning: hyprctl command failed: {e}", file=sys.stderr)
 

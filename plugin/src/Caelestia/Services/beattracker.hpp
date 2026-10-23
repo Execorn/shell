@@ -11,7 +11,9 @@ class BeatProcessor : public AudioProcessor {
 
 public:
     explicit BeatProcessor(QObject* parent = nullptr);
-    ~BeatProcessor();
+    ~BeatProcessor() override;
+
+    void init() override;
 
 signals:
     void beat(smpl_t bpm);

@@ -46,7 +46,7 @@ Item {
                 required property PwNode modelData
 
                 ButtonGroup.group: sinks
-                checked: Audio.activePhysicalSinkId === modelData.id
+                checked: modelData ? Audio.activePhysicalSinkId === modelData.id : false
                 onClicked: if (modelData) Audio.setAudioSink(modelData)
                 text: modelData ? modelData.description : ""
             }

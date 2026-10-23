@@ -44,7 +44,7 @@ Singleton {
     Process {
         id: getPresets
 
-        running: true
+        running: false
         command: ["/usr/bin/python3", "-u", Paths.eqControlScript, "list-json"]
         stdout: StdioCollector {
             onStreamFinished: {

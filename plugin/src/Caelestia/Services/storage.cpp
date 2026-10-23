@@ -192,14 +192,23 @@ QStringList Storage::resolveToPhysicalDisks(const QString& devicePath) {
     if (devicePath.isEmpty() || !devicePath.startsWith(QLatin1Char('/'))) {
         return {};
     }
+    static QHash<QString, QStringList> s_cache;
+    if (const auto it = s_cache.constFind(devicePath); it != s_cache.constEnd()) {
+        return it.value();
+    }
     struct stat st{};
     if (::stat(devicePath.toLocal8Bit().constData(), &st) != 0) {
         return {};
     }
     if (!S_ISBLK(st.st_mode)) {
+        s_cache.insert(devicePath, {});
         return {};
     }
-    return resolveByDevt(major(st.st_rdev), minor(st.st_rdev));
+    const QStringList resolved = resolveByDevt(major(st.st_rdev), minor(st.st_rdev));
+    if (!resolved.isEmpty()) {
+        s_cache.insert(devicePath, resolved);
+    }
+    return resolved;
 }
 
 void Storage::tick() {

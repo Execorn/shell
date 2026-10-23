@@ -11,8 +11,9 @@ class CavaProcessor : public AudioProcessor {
 
 public:
     explicit CavaProcessor(QObject* parent = nullptr);
-    ~CavaProcessor();
+    ~CavaProcessor() override;
 
+    void init() override;
     void setBars(int bars);
 
 signals:

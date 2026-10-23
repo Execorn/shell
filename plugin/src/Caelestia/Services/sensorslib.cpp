@@ -7,6 +7,7 @@
 #include <mutex>
 #include <qloggingcategory.h>
 #include <sensors/sensors.h>
+#include <vector>
 
 Q_LOGGING_CATEGORY(lcSensorsLib, "caelestia.services.sensorslib", QtInfoMsg)
 
@@ -14,30 +15,21 @@ namespace caelestia::services::sensorslib {
 
 namespace {
 
+struct SensorInput {
+    const sensors_chip_name* chip = nullptr;
+    int subfeatureNr = -1;
+};
+
 std::atomic<bool> g_initOk{ false };
 std::once_flag g_initFlag;
+std::vector<SensorInput> g_cpuPrimary;
+std::vector<SensorInput> g_cpuFallback;
+std::vector<SensorInput> g_gpuPrimary;
+std::vector<SensorInput> g_gpuFallback;
 
-void doInit() {
-    if (sensors_init(nullptr) != 0) {
-        qCWarning(lcSensorsLib, "sensors_init failed");
-        g_initOk.store(false, std::memory_order_release);
-        return;
-    }
-    g_initOk.store(true, std::memory_order_release);
-    std::atexit([] {
-        if (g_initOk.load(std::memory_order_acquire)) {
-            sensors_cleanup();
-        }
-    });
-}
-
-[[nodiscard]] std::optional<double> readTempInput(const sensors_chip_name* chip, const sensors_feature* feat) {
-    const sensors_subfeature* sf = sensors_get_subfeature(chip, feat, SENSORS_SUBFEATURE_TEMP_INPUT);
-    if (!sf) {
-        return std::nullopt;
-    }
+[[nodiscard]] std::optional<double> readSensorInput(const SensorInput& input) {
     double value = 0.0;
-    if (sensors_get_value(chip, sf->number, &value) != 0) {
+    if (sensors_get_value(input.chip, input.subfeatureNr, &value) != 0) {
         return std::nullopt;
     }
     return value;
@@ -62,6 +54,62 @@ bool labelStartsWith(const QByteArray& label, const char* prefix) {
     return static_cast<size_t>(label.size()) >= n && std::memcmp(label.constData(), prefix, n) == 0;
 }
 
+void doInit() {
+    if (sensors_init(nullptr) != 0) {
+        qCWarning(lcSensorsLib, "sensors_init failed");
+        g_initOk.store(false, std::memory_order_release);
+        return;
+    }
+
+    int chipNr = 0;
+    while (const sensors_chip_name* chip = sensors_get_detected_chips(nullptr, &chipNr)) {
+        const bool isPci = (chip->bus.type == SENSORS_BUS_TYPE_PCI);
+
+        int featNr = 0;
+        while (const sensors_feature* feat = sensors_get_features(chip, &featNr)) {
+            if (feat->type != SENSORS_FEATURE_TEMP) {
+                continue;
+            }
+            const sensors_subfeature* sf = sensors_get_subfeature(chip, feat, SENSORS_SUBFEATURE_TEMP_INPUT);
+            if (!sf) {
+                continue;
+            }
+            const QByteArray label = featureLabel(chip, feat);
+            if (label.isEmpty()) {
+                continue;
+            }
+
+            const SensorInput input{ chip, sf->number };
+
+            if (labelStartsWith(label, "Package id ") || labelEquals(label, "Tdie")) {
+                g_cpuPrimary.push_back(input);
+            } else if (labelEquals(label, "Tctl")) {
+                g_cpuFallback.push_back(input);
+            }
+
+            if (isPci) {
+                const bool tempIndexed = labelStartsWith(label, "temp") && label.size() > 4 &&
+                                         std::isdigit(static_cast<unsigned char>(label[4]));
+                const bool isPrimary = tempIndexed || labelEquals(label, "GPU core") || labelEquals(label, "edge");
+                const bool isFallback = labelEquals(label, "junction") || labelEquals(label, "mem");
+
+                if (isPrimary) {
+                    g_gpuPrimary.push_back(input);
+                } else if (isFallback) {
+                    g_gpuFallback.push_back(input);
+                }
+            }
+        }
+    }
+
+    g_initOk.store(true, std::memory_order_release);
+    std::atexit([] {
+        if (g_initOk.load(std::memory_order_acquire)) {
+            sensors_cleanup();
+        }
+    });
+}
+
 } // namespace
 
 void ensureInit() {
@@ -74,34 +122,23 @@ std::optional<double> cpuPackageTemp() {
         return std::nullopt;
     }
 
-    std::optional<double> primary;  // Package id N / Tdie
-    std::optional<double> fallback; // Tctl
-
-    int chipNr = 0;
-    while (const sensors_chip_name* chip = sensors_get_detected_chips(nullptr, &chipNr)) {
-        int featNr = 0;
-        while (const sensors_feature* feat = sensors_get_features(chip, &featNr)) {
-            if (feat->type != SENSORS_FEATURE_TEMP) {
-                continue;
-            }
-            const QByteArray label = featureLabel(chip, feat);
-            if (label.isEmpty()) {
-                continue;
-            }
-
-            if (labelStartsWith(label, "Package id ") || labelEquals(label, "Tdie")) {
-                if (auto v = readTempInput(chip, feat)) {
-                    primary = v;
-                }
-            } else if (labelEquals(label, "Tctl")) {
-                if (auto v = readTempInput(chip, feat)) {
-                    fallback = v;
-                }
-            }
+    std::optional<double> primary;
+    for (const SensorInput& input : g_cpuPrimary) {
+        if (auto v = readSensorInput(input)) {
+            primary = v;
         }
     }
+    if (primary.has_value()) {
+        return primary;
+    }
 
-    return primary.has_value() ? primary : fallback;
+    std::optional<double> fallback;
+    for (const SensorInput& input : g_cpuFallback) {
+        if (auto v = readSensorInput(input)) {
+            fallback = v;
+        }
+    }
+    return fallback;
 }
 
 std::optional<double> gpuPciAverageTemp() {
@@ -112,50 +149,23 @@ std::optional<double> gpuPciAverageTemp() {
 
     double sumPrimary = 0.0;
     int countPrimary = 0;
-    double sumFallback = 0.0;
-    int countFallback = 0;
-
-    int chipNr = 0;
-    while (const sensors_chip_name* chip = sensors_get_detected_chips(nullptr, &chipNr)) {
-        if (chip->bus.type != SENSORS_BUS_TYPE_PCI) {
-            continue;
-        }
-
-        int featNr = 0;
-        while (const sensors_feature* feat = sensors_get_features(chip, &featNr)) {
-            if (feat->type != SENSORS_FEATURE_TEMP) {
-                continue;
-            }
-            const QByteArray label = featureLabel(chip, feat);
-            if (label.isEmpty()) {
-                continue;
-            }
-
-            const bool tempIndexed = labelStartsWith(label, "temp") && label.size() > 4 &&
-                                     std::isdigit(static_cast<unsigned char>(label[4]));
-            const bool isPrimary = tempIndexed || labelEquals(label, "GPU core") || labelEquals(label, "edge");
-            const bool isFallback = labelEquals(label, "junction") || labelEquals(label, "mem");
-
-            if (!isPrimary && !isFallback) {
-                continue;
-            }
-
-            const auto v = readTempInput(chip, feat);
-            if (!v) {
-                continue;
-            }
-            if (isPrimary) {
-                sumPrimary += *v;
-                ++countPrimary;
-            } else {
-                sumFallback += *v;
-                ++countFallback;
-            }
+    for (const SensorInput& input : g_gpuPrimary) {
+        if (const auto v = readSensorInput(input)) {
+            sumPrimary += *v;
+            ++countPrimary;
         }
     }
-
     if (countPrimary > 0) {
         return sumPrimary / countPrimary;
+    }
+
+    double sumFallback = 0.0;
+    int countFallback = 0;
+    for (const SensorInput& input : g_gpuFallback) {
+        if (const auto v = readSensorInput(input)) {
+            sumFallback += *v;
+            ++countFallback;
+        }
     }
     if (countFallback > 0) {
         return sumFallback / countFallback;

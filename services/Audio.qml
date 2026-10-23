@@ -199,9 +199,9 @@ except Exception:
 
     readonly property int activePhysicalSourceId: {
         const prefNode = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
-        if (prefNode) return prefNode.id;
-        if (isNodeValid(source) && physicalSources.indexOf(source) !== -1) return source.id;
-        return physicalSources.length > 0 ? physicalSources[0].id : -1;
+        if (prefNode && prefNode.id !== undefined) return prefNode.id;
+        if (isNodeValid(source) && physicalSources.indexOf(source) !== -1 && source.id !== undefined) return source.id;
+        return (physicalSources.length > 0 && physicalSources[0]?.id !== undefined) ? physicalSources[0].id : -1;
     }
 
     function routeMicrophoneFrom(sourceName: string): void {
@@ -236,6 +236,9 @@ except Exception:
         if (!newSource || !newSource.name) return;
         manualSourceOverride = true;
         preferredPhysicalSource = newSource.name;
+        if (Pipewire) {
+            Pipewire.preferredDefaultAudioSource = newSource;
+        }
         Qt.callLater(root.updateActiveSource);
     }
 
@@ -384,11 +387,17 @@ except Exception:
             }
         }
         
-        // 2. Look for USB microphone / audio interface
+        // 2. Look for dedicated USB microphone (excluding loopback & audio interface instrument inputs)
         for (let i = 0; i < physicalSources.length; i++) {
             const s = physicalSources[i];
             if (isNodeValid(s) && s.name && (s.name.indexOf("alsa_input.usb") === 0 || s.name.indexOf("usb-") !== -1)) {
-                return s.name;
+                const nameLower = s.name.toLowerCase();
+                const descLower = (s.description || "").toLowerCase();
+                const isLoopback = nameLower.indexOf("loopback") !== -1 || descLower.indexOf("loopback") !== -1 || nameLower.indexOf("hifi__line2") !== -1;
+                const isGuitarInterface = nameLower.indexOf("minifuse") !== -1 || descLower.indexOf("minifuse") !== -1 || descLower.indexOf("inst ") !== -1;
+                if (!isLoopback && !isGuitarInterface) {
+                    return s.name;
+                }
             }
         }
         
@@ -396,6 +405,17 @@ except Exception:
         const internalSource = physicalSources.find(s => isNodeValid(s) && s.name && (s.name.indexOf("pci-") !== -1 || s.name.indexOf("analog-stereo") !== -1));
         if (internalSource && internalSource.name) {
             return internalSource.name;
+        }
+
+        // 4. Fallback to any non-loopback source
+        const nonLoopbackSource = physicalSources.find(s => {
+            if (!isNodeValid(s) || !s.name) return false;
+            const nameLower = s.name.toLowerCase();
+            const descLower = (s.description || "").toLowerCase();
+            return nameLower.indexOf("loopback") === -1 && descLower.indexOf("loopback") === -1 && nameLower.indexOf("hifi__line2") === -1;
+        });
+        if (nonLoopbackSource && nonLoopbackSource.name) {
+            return nonLoopbackSource.name;
         }
         
         const firstSource = physicalSources.find(s => isNodeValid(s) && s.name);
@@ -579,7 +599,9 @@ except Exception:
                 const name = currentPhysicalSourceNames[i];
                 if (root.knownPhysicalSourceNames.indexOf(name) === -1) {
                     console.log("[Audio.qml] Newly connected physical source:", name);
-                    if (name.indexOf("bluez_input") !== -1 || name.indexOf("bluez_source") !== -1 || name.indexOf("usb") !== -1) {
+                    const nameLower = name.toLowerCase();
+                    const isIgnoredUsbSource = nameLower.indexOf("loopback") !== -1 || nameLower.indexOf("hifi__line2") !== -1 || nameLower.indexOf("minifuse") !== -1;
+                    if (name.indexOf("bluez_input") !== -1 || name.indexOf("bluez_source") !== -1 || (name.indexOf("usb") !== -1 && !isIgnoredUsbSource)) {
                         console.log("[Audio.qml] Auto-switching to newly connected priority input device:", name);
                         root.manualSourceOverride = false;
                     }

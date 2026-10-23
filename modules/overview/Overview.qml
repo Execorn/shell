@@ -19,6 +19,8 @@ Scope {
     property alias active: loader.active
 
     readonly property var groupedWindows: {
+        if (!root.active)
+            return ({});
         let groups = {};
         for (let i = 1; i <= 10; i++) {
             groups[i] = [];

@@ -1,9 +1,11 @@
 #include "imagecacher.hpp"
 
 #include <qcryptographichash.h>
+#include <qdatetime.h>
 #include <qdir.h>
 #include <qfile.h>
 #include <qfileinfo.h>
+#include <qhash.h>
 #include <qimage.h>
 #include <qimagereader.h>
 #include <qloggingcategory.h>
@@ -18,8 +20,41 @@ namespace caelestia::images {
 
 namespace {
 
+struct CachedHashEntry {
+    qint64 fileSize = -1;
+    qint64 mtimeMsecs = -1;
+    QString sha256;
+};
+
+QMutex& hashCacheMutex() {
+    static QMutex s_mutex;
+    return s_mutex;
+}
+
+QHash<QString, CachedHashEntry>& hashCache() {
+    static QHash<QString, CachedHashEntry> s_cache;
+    return s_cache;
+}
+
 QString sha256sum(const QString& path) {
-    QFile file(path);
+    const QFileInfo info(path);
+    if (!info.exists() || !info.isFile()) {
+        return {};
+    }
+
+    const QString canonical = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
+    const qint64 fsize = info.size();
+    const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+
+    {
+        QMutexLocker locker(&hashCacheMutex());
+        const auto it = hashCache().constFind(canonical);
+        if (it != hashCache().cend() && it->fileSize == fsize && it->mtimeMsecs == mtime) {
+            return it->sha256;
+        }
+    }
+
+    QFile file(canonical);
     if (!file.open(QIODevice::ReadOnly)) {
         qCWarning(lcCacher).noquote() << "sha256sum: failed to open" << path;
         return {};
@@ -29,7 +64,12 @@ QString sha256sum(const QString& path) {
     hash.addData(&file);
     file.close();
 
-    return hash.result().toHex();
+    const QString hex = QString::fromLatin1(hash.result().toHex());
+    {
+        QMutexLocker locker(&hashCacheMutex());
+        hashCache().insert(canonical, CachedHashEntry{ fsize, mtime, hex });
+    }
+    return hex;
 }
 
 QString fillSuffix(ImageCacher::FillMode fillMode) {
@@ -67,6 +107,54 @@ QString ImageCacher::cachePathFor(const QString& sourcePath, const QSize& size, 
     return cacheDir() + QLatin1Char('/') + filename;
 }
 
+QImage ImageCacher::decodeAndScale(const QString& sourcePath, const QSize& size, FillMode fillMode) {
+    Qt::AspectRatioMode scaleMode = Qt::IgnoreAspectRatio;
+    switch (fillMode) {
+    case FillMode::Crop:
+        scaleMode = Qt::KeepAspectRatioByExpanding;
+        break;
+    case FillMode::Fit:
+        scaleMode = Qt::KeepAspectRatio;
+        break;
+    case FillMode::Stretch:
+        scaleMode = Qt::IgnoreAspectRatio;
+        break;
+    }
+
+    QImageReader reader(sourcePath);
+    if (size.isValid()) {
+        const QSize srcSize = reader.size();
+        if (srcSize.isValid() && (srcSize.width() > size.width() * 2 || srcSize.height() > size.height() * 2)) {
+            reader.setScaledSize(srcSize.scaled(size * 2, scaleMode));
+        }
+    }
+    QImage image = reader.read();
+    if (image.isNull()) {
+        qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
+        return {};
+    }
+
+    image.convertTo(QImage::Format_ARGB32);
+    image = image.scaled(size, scaleMode, Qt::SmoothTransformation);
+
+    if (image.isNull()) {
+        qCWarning(lcCacher).noquote() << "Failed to scale" << sourcePath;
+        return {};
+    }
+
+    if (fillMode == FillMode::Stretch || image.size() == size) {
+        return image;
+    }
+
+    QImage canvas(size, QImage::Format_ARGB32);
+    canvas.fill(Qt::transparent);
+
+    QPainter painter(&canvas);
+    painter.drawImage((size.width() - image.width()) / 2, (size.height() - image.height()) / 2, image);
+    painter.end();
+    return canvas;
+}
+
 ImageCacher* ImageCacher::instance() {
     static ImageCacher s_instance;
     return &s_instance;
@@ -97,55 +185,38 @@ void ImageCacher::schedule(const QString& sourcePath, const QString& cachePath, 
     });
 }
 
+void ImageCacher::scheduleSave(const QString& cachePath, const QImage& image) {
+    if (cachePath.isEmpty() || image.isNull())
+        return;
+
+    {
+        QMutexLocker locker(&m_mutex);
+        if (m_inflight.contains(cachePath))
+            return;
+        m_inflight.insert(cachePath);
+    }
+
+    QThreadPool::globalInstance()->start([this, cachePath, image]() {
+        saveToCache(cachePath, image);
+        QMutexLocker locker(&m_mutex);
+        m_inflight.remove(cachePath);
+    });
+}
+
 void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode) {
     if (QFile::exists(cachePath)) {
         return;
     }
 
-    Qt::AspectRatioMode scaleMode;
-    switch (fillMode) {
-    case FillMode::Crop:
-        scaleMode = Qt::KeepAspectRatioByExpanding;
-        break;
-    case FillMode::Fit:
-        scaleMode = Qt::KeepAspectRatio;
-        break;
-    case FillMode::Stretch:
-        scaleMode = Qt::IgnoreAspectRatio;
-        break;
+    const QImage canvas = decodeAndScale(sourcePath, size, fillMode);
+    if (!canvas.isNull()) {
+        saveToCache(cachePath, canvas);
     }
+}
 
-    QImageReader reader(sourcePath);
-    if (size.isValid()) {
-        const QSize srcSize = reader.size();
-        if (srcSize.isValid() && (srcSize.width() > size.width() * 2 || srcSize.height() > size.height() * 2)) {
-            reader.setScaledSize(srcSize.scaled(size * 2, scaleMode));
-        }
-    }
-    QImage image = reader.read();
-    if (image.isNull()) {
-        qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
+void ImageCacher::saveToCache(const QString& cachePath, const QImage& image) {
+    if (QFile::exists(cachePath)) {
         return;
-    }
-
-    image.convertTo(QImage::Format_ARGB32);
-    image = image.scaled(size, scaleMode, Qt::SmoothTransformation);
-
-    if (image.isNull()) {
-        qCWarning(lcCacher).noquote() << "Failed to scale" << sourcePath;
-        return;
-    }
-
-    QImage canvas;
-    if (fillMode == FillMode::Stretch) {
-        canvas = image;
-    } else {
-        canvas = QImage(size, QImage::Format_ARGB32);
-        canvas.fill(Qt::transparent);
-
-        QPainter painter(&canvas);
-        painter.drawImage((size.width() - image.width()) / 2, (size.height() - image.height()) / 2, image);
-        painter.end();
     }
 
     const QString parent = QFileInfo(cachePath).absolutePath();
@@ -155,7 +226,7 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
     }
 
     QSaveFile saveFile(cachePath);
-    if (!saveFile.open(QIODevice::WriteOnly) || !canvas.save(&saveFile, "PNG") || !saveFile.commit()) {
+    if (!saveFile.open(QIODevice::WriteOnly) || !image.save(&saveFile, "PNG", 80) || !saveFile.commit()) {
         qCWarning(
             lcCacher, "Failed to save to %s: %s", qUtf8Printable(cachePath), qUtf8Printable(saveFile.errorString()));
         return;

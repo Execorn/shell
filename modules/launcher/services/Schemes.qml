@@ -21,7 +21,13 @@ Searcher {
         return `${item.name} ${item.flavour}`;
     }
 
+    property bool schemesLoaded: false
+
     function reload(): void {
+        if (!schemesLoaded) {
+            schemesLoaded = true;
+            getSchemes.running = true;
+        }
         getCurrent.running = true;
     }
 
@@ -39,7 +45,7 @@ Searcher {
     Process {
         id: getSchemes
 
-        running: true
+        running: false
         command: ["caelestia", "scheme", "list"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -63,7 +69,7 @@ Searcher {
     Process {
         id: getCurrent
 
-        running: true
+        running: false
         command: ["caelestia", "scheme", "get", "-nfv"]
         stdout: StdioCollector {
             onStreamFinished: {

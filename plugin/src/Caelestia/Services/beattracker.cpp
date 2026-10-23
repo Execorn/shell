@@ -8,9 +8,9 @@ namespace caelestia::services {
 
 BeatProcessor::BeatProcessor(QObject* parent)
     : AudioProcessor(parent)
-    , m_tempo(new_aubio_tempo("default", 1024, ac::CHUNK_SIZE, ac::SAMPLE_RATE))
-    , m_in(new_fvec(ac::CHUNK_SIZE))
-    , m_out(new_fvec(2)) {};
+    , m_tempo(nullptr)
+    , m_in(nullptr)
+    , m_out(nullptr) {}
 
 BeatProcessor::~BeatProcessor() {
     if (m_tempo) {
@@ -21,6 +21,19 @@ BeatProcessor::~BeatProcessor() {
     }
     if (m_out) {
         del_fvec(m_out);
+    }
+}
+
+void BeatProcessor::init() {
+    AudioProcessor::init();
+    if (!m_tempo) {
+        m_tempo = new_aubio_tempo("default", 1024, ac::CHUNK_SIZE, ac::SAMPLE_RATE);
+    }
+    if (!m_in) {
+        m_in = new_fvec(ac::CHUNK_SIZE);
+    }
+    if (!m_out) {
+        m_out = new_fvec(2);
     }
 }
 

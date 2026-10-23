@@ -70,7 +70,6 @@ PathView {
     Component.onDestruction: Wallpapers.stopPreview()
 
     onCurrentIndexChanged: triggerPreview()
-    onCurrentItemChanged: triggerPreview()
 
     property real scrollAccumulated: 0
 

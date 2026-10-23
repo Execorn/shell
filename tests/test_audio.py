@@ -1624,3 +1624,17 @@ def test_ui_application_stream_volume_and_mute(qapp, qml_engine, mock_pipewire, 
     assert stream_mute_btn[0].property("icon") == "volume_up", "Stream mute button icon should change to volume_up"
 
     ui.deleteLater()
+
+def test_source_fallback_ignores_minifuse_loopback_and_instrument(audio_suite):
+    n_loopback = MockPwNode(20, "alsa_input.usb-ARTURIA_MiniFuse_2-00.HiFi__Line2__source", "MiniFuse 2 Loopback L/R", is_sink=False, ready=True)
+    n_inst = MockPwNode(21, "alsa_input.usb-ARTURIA_MiniFuse_2-00.HiFi__Mic1__source", "MiniFuse 2 Mic/Line/Inst 1 (L)", is_sink=False, ready=True)
+    n_usb_mic = MockPwNode(22, "alsa_input.usb-USB_Streaming_Microphone-00.analog-stereo", "USB Streaming Microphone Analog Stereo", is_sink=False, ready=True)
+
+    audio_suite.mock_pw.add_node(n_loopback)
+    audio_suite.mock_pw.add_node(n_inst)
+    audio_suite.mock_pw.add_node(n_usb_mic)
+    QtCore.QCoreApplication.processEvents()
+
+    best_src = audio_suite.audio.getBestInputSourceName()
+    assert best_src == "alsa_input.usb-USB_Streaming_Microphone-00.analog-stereo"
+

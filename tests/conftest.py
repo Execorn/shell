@@ -11,6 +11,8 @@ from PySide6.QtQuick import QQuickItem
 # Set Qt offscreen platform before application creation
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QML_DISABLE_DISK_CACHE"] = "1"
+os.environ.pop("QML2_IMPORT_PATH", None)
+os.environ.pop("QML_IMPORT_PATH", None)
 
 # Setup wpctl mock binary interception mechanism
 bin_dir = pathlib.Path("/tmp/caelestia-test-bin")

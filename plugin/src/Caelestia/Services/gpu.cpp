@@ -7,6 +7,7 @@
 #include <qdir.h>
 #include <qdiriterator.h>
 #include <qfile.h>
+#include <qlibrary.h>
 #include <qregularexpression.h>
 
 namespace caelestia::services {
@@ -39,6 +40,100 @@ QString cleanName(QString s) {
     s.replace(spaces, QStringLiteral(" "));
     return s.trimmed();
 }
+
+struct NvmlUtilization {
+    unsigned int gpu;
+    unsigned int memory;
+};
+
+class NvmlClient {
+public:
+    static NvmlClient& instance() {
+        static NvmlClient inst;
+        return inst;
+    }
+
+    [[nodiscard]] bool available() const {
+        return m_available;
+    }
+
+    [[nodiscard]] QString deviceName() const {
+        if (!m_available || !m_getName) {
+            return {};
+        }
+        char buf[96] = {};
+        if (m_getName(m_device, buf, sizeof(buf)) != 0) {
+            return {};
+        }
+        return cleanName(QString::fromUtf8(buf));
+    }
+
+    [[nodiscard]] bool queryMetrics(qreal& outUsage, qreal& outTemp) const {
+        if (!m_available || !m_getUtil || !m_getTemp) {
+            return false;
+        }
+        NvmlUtilization util{};
+        unsigned int temp = 0;
+        if (m_getUtil(m_device, &util) != 0) {
+            return false;
+        }
+        if (m_getTemp(m_device, 0, &temp) != 0) {
+            return false;
+        }
+        outUsage = static_cast<qreal>(util.gpu) / 100.0;
+        outTemp = static_cast<qreal>(temp);
+        return true;
+    }
+
+private:
+    using DeviceHandle = void*;
+    using InitFn = int (*)();
+    using ShutdownFn = int (*)();
+    using GetHandleByIndexFn = int (*)(unsigned int, DeviceHandle*);
+    using GetNameFn = int (*)(DeviceHandle, char*, unsigned int);
+    using GetUtilFn = int (*)(DeviceHandle, NvmlUtilization*);
+    using GetTempFn = int (*)(DeviceHandle, int, unsigned int*);
+
+    NvmlClient()
+        : m_lib(QStringLiteral("nvidia-ml"), 1) {
+        if (!m_lib.load()) {
+            return;
+        }
+        auto initFn = reinterpret_cast<InitFn>(m_lib.resolve("nvmlInit_v2"));
+        m_shutdown = reinterpret_cast<ShutdownFn>(m_lib.resolve("nvmlShutdown"));
+        auto getHandle = reinterpret_cast<GetHandleByIndexFn>(m_lib.resolve("nvmlDeviceGetHandleByIndex_v2"));
+        m_getName = reinterpret_cast<GetNameFn>(m_lib.resolve("nvmlDeviceGetName"));
+        m_getUtil = reinterpret_cast<GetUtilFn>(m_lib.resolve("nvmlDeviceGetUtilizationRates"));
+        m_getTemp = reinterpret_cast<GetTempFn>(m_lib.resolve("nvmlDeviceGetTemperature"));
+
+        if (!initFn || !getHandle || !m_getName || !m_getUtil || !m_getTemp) {
+            return;
+        }
+        if (initFn() != 0) {
+            return;
+        }
+        m_initialized = true;
+        if (getHandle(0, &m_device) != 0 || !m_device) {
+            return;
+        }
+        m_available = true;
+    }
+
+    ~NvmlClient() {
+        if (m_initialized && m_shutdown) {
+            m_shutdown();
+        }
+    }
+
+    QLibrary m_lib;
+    DeviceHandle m_device = nullptr;
+    ShutdownFn m_shutdown = nullptr;
+    GetNameFn m_getName = nullptr;
+    GetUtilFn m_getUtil = nullptr;
+    GetTempFn m_getTemp = nullptr;
+    bool m_initialized = false;
+    bool m_available = false;
+};
 
 QString parseNvidiaName(const QByteArray& out) {
     const QString first = QString::fromUtf8(out).split('\n').value(0).trimmed();
@@ -222,6 +317,11 @@ void Gpu::detectGpu() {
     if (m_detecting) {
         return;
     }
+    if (const QString nvName = NvmlClient::instance().deviceName(); !nvName.isEmpty()) {
+        setAutoType(Nvidia);
+        setName(nvName);
+        return;
+    }
     m_detecting = true;
 
     // Probe in priority order, stopping at the first result
@@ -305,6 +405,20 @@ void Gpu::readGenericUsage() {
 }
 
 void Gpu::startNvidiaUsage() {
+    qreal nvUsage = 0.0;
+    qreal nvTemp = 0.0;
+    if (NvmlClient::instance().queryMetrics(nvUsage, nvTemp)) {
+        if (std::abs(nvUsage - m_percentage) > 0.0001) {
+            m_percentage = nvUsage;
+            emit percentageChanged();
+        }
+        if (std::abs(nvTemp - m_temperature) > 0.05) {
+            m_temperature = nvTemp;
+            emit temperatureChanged();
+        }
+        return;
+    }
+
     if (m_nvidiaQuerying) {
         return;
     }

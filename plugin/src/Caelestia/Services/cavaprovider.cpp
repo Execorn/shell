@@ -14,17 +14,25 @@ namespace caelestia::services {
 CavaProcessor::CavaProcessor(QObject* parent)
     : AudioProcessor(parent)
     , m_plan(nullptr)
-    , m_in(new double[ac::CHUNK_SIZE])
+    , m_in(nullptr)
     , m_out(nullptr)
-    , m_bars(0) {};
+    , m_bars(0) {}
 
 CavaProcessor::~CavaProcessor() {
     cleanup();
     delete[] m_in;
 }
 
+void CavaProcessor::init() {
+    AudioProcessor::init();
+    if (!m_in) {
+        m_in = new double[ac::CHUNK_SIZE];
+    }
+    initCava();
+}
+
 void CavaProcessor::process() {
-    if (!m_plan || m_bars == 0 || !m_out) {
+    if (!m_plan || m_bars == 0 || !m_in || !m_out) {
         return;
     }
 
@@ -88,7 +96,7 @@ void CavaProcessor::cleanup() {
 }
 
 void CavaProcessor::initCava() {
-    if (m_plan || m_bars == 0) {
+    if (m_plan || m_bars == 0 || !m_in) {
         return;
     }
 

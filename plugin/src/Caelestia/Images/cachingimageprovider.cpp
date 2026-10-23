@@ -48,18 +48,12 @@ private:
         }
 
         QSize size = m_requestedSize;
-        const bool needsW = size.width() <= 0;
-        const bool needsH = size.height() <= 0;
+        bool needsW = size.width() <= 0;
+        bool needsH = size.height() <= 0;
 
-        // If both dimensions are missing, return the original directly
         if (needsW && needsH) {
-            qCDebug(lcCProv).noquote() << "Given source size is invalid, returning original:" << path;
-            m_image = QImage(path);
-            if (m_image.isNull()) {
-                m_error = QStringLiteral("Failed to decode source: ") + path;
-                qCWarning(lcCProv).noquote() << m_error;
-            }
-            return;
+            size = QSize(512, 0);
+            needsW = false;
         }
 
         // If one dimension is missing, derive it from the source aspect ratio
@@ -89,27 +83,14 @@ private:
             }
         }
 
-        ImageCacher::instance()->schedule(path, cachePath, size, m_fillMode);
-
-        Qt::AspectRatioMode scaleMode = Qt::IgnoreAspectRatio;
-        if (m_fillMode == ImageCacher::FillMode::Crop) {
-            scaleMode = Qt::KeepAspectRatioByExpanding;
-        } else if (m_fillMode == ImageCacher::FillMode::Fit) {
-            scaleMode = Qt::KeepAspectRatio;
-        }
-
-        QImageReader reader(path);
-        const QSize srcSize = reader.size();
-        if (srcSize.isValid() && (srcSize.width() > size.width() * 2 || srcSize.height() > size.height() * 2)) {
-            reader.setScaledSize(srcSize.scaled(size * 2, scaleMode));
-        }
-        m_image = reader.read();
+        m_image = ImageCacher::decodeAndScale(path, size, m_fillMode);
         if (m_image.isNull()) {
             m_error = QStringLiteral("Failed to decode source: ") + path;
             qCWarning(lcCProv).noquote() << m_error;
             return;
         }
-        m_image = m_image.scaled(size, scaleMode, Qt::SmoothTransformation);
+
+        ImageCacher::instance()->scheduleSave(cachePath, m_image);
     }
 
     QString m_id;
@@ -122,7 +103,10 @@ private:
 } // namespace
 
 CachingImageProvider::CachingImageProvider(FillMode fillMode)
-    : m_fillMode(fillMode) {}
+    : m_fillMode(fillMode) {
+    (void)QThreadPool::globalInstance();
+    (void)ImageCacher::instance();
+}
 
 QQuickImageResponse* CachingImageProvider::requestImageResponse(const QString& id, const QSize& requestedSize) {
     auto* const response = new CachingImageResponse(id, requestedSize, m_fillMode);

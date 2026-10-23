@@ -135,20 +135,31 @@ Searcher {
         Quickshell.execDetached(["python3", Quickshell.shellPath("scripts/apply-theme.py"), "--wallpaper", path, "--no-wwal"]);
     }
 
+    Timer {
+        id: previewDebounceTimer
+        interval: 60
+        repeat: false
+        onTriggered: {
+            if (!root.showPreview || !root.previewPath)
+                return;
+            Quickshell.execDetached(["python3", Quickshell.shellPath("scripts/wwal-helper.py"), "scroll", root.previewPath]);
+            if (Colours.scheme === "dynamic")
+                getPreviewColoursProc.running = true;
+        }
+    }
+
     function preview(path: string): void {
         if (!path || (showPreview && path === previewPath))
             return;
         previewPath = path;
         showPreview = true;
-        Quickshell.execDetached(["python3", Quickshell.shellPath("scripts/wwal-helper.py"), "scroll", path]);
-
-        if (Colours.scheme === "dynamic")
-            getPreviewColoursProc.running = true;
+        previewDebounceTimer.restart();
     }
 
     function stopPreview(): void {
         if (!showPreview)
             return;
+        previewDebounceTimer.stop();
         showPreview = false;
         if (previewPath !== actualCurrent && actualCurrent) {
             Quickshell.execDetached(["python3", Quickshell.shellPath("scripts/wwal-helper.py"), "restore", actualCurrent]);

@@ -551,7 +551,7 @@ class MockQuickshell(QObject):
             pathlib.Path("/tmp/bluetoothctl_calls.log").open("a").write(f"{cmd_str}\n")
         elif bin_name == "pkill":
             pathlib.Path("/tmp/pkill_calls.log").open("a").write(f"{cmd_str}\n")
-        elif bin_name == "apply-theme.py":
+        elif bin_name == "apply-theme.py" or (bin_name == "python3" and len(cmd_args) > 1 and pathlib.Path(cmd_args[1]).name == "apply-theme.py"):
             if "--wallpaper" in cmd_args:
                 idx = cmd_args.index("--wallpaper")
                 wall_path = cmd_args[idx + 1]
@@ -559,6 +559,9 @@ class MockQuickshell(QObject):
                     pathlib.Path("/tmp/caelestia_calls.log").open("a").write("wallpaper -r\n")
                 else:
                     pathlib.Path("/tmp/caelestia_calls.log").open("a").write(f"wallpaper -f {wall_path}\n")
+        elif bin_name == "wwal-helper.py" or (bin_name == "python3" and len(cmd_args) > 1 and pathlib.Path(cmd_args[1]).name == "wwal-helper.py"):
+            if "random" in cmd_args:
+                pathlib.Path("/tmp/caelestia_calls.log").open("a").write("wallpaper -r\n")
 
     @Slot(str, result=str)
     def shellPath(self, path):

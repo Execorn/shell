@@ -222,6 +222,7 @@ StyledWindow {
             id: sessionBg
 
             panel: panels.sessionWrapper
+            visible: panels.session.visible
             deformAmount: 0.2
             x: panels.sessionWrapper.x + panels.session.x + bar.implicitWidth
             implicitWidth: panels.session.width
@@ -241,6 +242,7 @@ StyledWindow {
             id: osdBg
 
             panel: panels.osdWrapper
+            visible: panels.osd.visible
             deformAmount: 0.25
             x: panels.osdWrapper.x + panels.osd.x + bar.implicitWidth
             implicitWidth: panels.osd.width
@@ -360,6 +362,7 @@ StyledWindow {
         property real deformAmount: 0.15
 
         group: blobGroup
+        visible: panel.visible && implicitWidth > 0 && implicitHeight > 0
         x: panel.x + bar.implicitWidth
         y: panel.y + root.borderThickness
         implicitWidth: panel.width

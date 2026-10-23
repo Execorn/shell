@@ -62,13 +62,14 @@ void AudioProvider::init() {
     m_processor->moveToThread(m_thread);
 
     connect(m_thread, &QThread::started, m_processor, &AudioProcessor::init);
-
-    m_thread->start();
 }
 
 void AudioProvider::start() {
     if (m_processor) {
         AudioCollector::instance(); // Create instance on main thread
+        if (m_thread && !m_thread->isRunning()) {
+            m_thread->start();
+        }
         QMetaObject::invokeMethod(m_processor, &AudioProcessor::start);
     }
 }
