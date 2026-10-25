@@ -41,6 +41,26 @@ QString cleanName(QString s) {
     return s.trimmed();
 }
 
+QString procNvidiaGpuName() {
+    QDirIterator it(QStringLiteral("/proc/driver/nvidia/gpus"), QDir::Dirs | QDir::NoDotAndDotDot);
+    while (it.hasNext()) {
+        QFile infoFile(it.next() + QStringLiteral("/information"));
+        if (!infoFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            continue;
+        }
+        const QStringList lines = QString::fromUtf8(infoFile.readAll()).split('\n');
+        for (const QString& line : lines) {
+            if (line.startsWith(QStringLiteral("Model:"))) {
+                const QString model = cleanName(line.mid(6));
+                if (!model.isEmpty()) {
+                    return model;
+                }
+            }
+        }
+    }
+    return {};
+}
+
 struct NvmlUtilization {
     unsigned int gpu;
     unsigned int memory;
@@ -53,12 +73,8 @@ public:
         return inst;
     }
 
-    [[nodiscard]] bool available() const {
-        return m_available;
-    }
-
-    [[nodiscard]] QString deviceName() const {
-        if (!m_available || !m_getName) {
+    [[nodiscard]] QString deviceName() {
+        if (!ensureInitialized() || !m_getName) {
             return {};
         }
         char buf[96] = {};
@@ -68,8 +84,8 @@ public:
         return cleanName(QString::fromUtf8(buf));
     }
 
-    [[nodiscard]] bool queryMetrics(qreal& outUsage, qreal& outTemp) const {
-        if (!m_available || !m_getUtil || !m_getTemp) {
+    [[nodiscard]] bool queryMetrics(qreal& outUsage, qreal& outTemp) {
+        if (!ensureInitialized() || !m_getUtil || !m_getTemp) {
             return false;
         }
         NvmlUtilization util{};
@@ -85,6 +101,15 @@ public:
         return true;
     }
 
+    void release() {
+        if (m_initialized && m_shutdown) {
+            m_shutdown();
+        }
+        m_initialized = false;
+        m_available = false;
+        m_device = nullptr;
+    }
+
 private:
     using DeviceHandle = void*;
     using InitFn = int (*)();
@@ -95,44 +120,60 @@ private:
     using GetTempFn = int (*)(DeviceHandle, int, unsigned int*);
 
     NvmlClient()
-        : m_lib(QStringLiteral("nvidia-ml"), 1) {
-        if (!m_lib.load()) {
-            return;
-        }
-        auto initFn = reinterpret_cast<InitFn>(m_lib.resolve("nvmlInit_v2"));
-        m_shutdown = reinterpret_cast<ShutdownFn>(m_lib.resolve("nvmlShutdown"));
-        auto getHandle = reinterpret_cast<GetHandleByIndexFn>(m_lib.resolve("nvmlDeviceGetHandleByIndex_v2"));
-        m_getName = reinterpret_cast<GetNameFn>(m_lib.resolve("nvmlDeviceGetName"));
-        m_getUtil = reinterpret_cast<GetUtilFn>(m_lib.resolve("nvmlDeviceGetUtilizationRates"));
-        m_getTemp = reinterpret_cast<GetTempFn>(m_lib.resolve("nvmlDeviceGetTemperature"));
-
-        if (!initFn || !getHandle || !m_getName || !m_getUtil || !m_getTemp) {
-            return;
-        }
-        if (initFn() != 0) {
-            return;
-        }
-        m_initialized = true;
-        if (getHandle(0, &m_device) != 0 || !m_device) {
-            return;
-        }
-        m_available = true;
-    }
+        : m_lib(QStringLiteral("nvidia-ml"), 1) {}
 
     ~NvmlClient() {
-        if (m_initialized && m_shutdown) {
-            m_shutdown();
+        release();
+    }
+
+    bool ensureInitialized() {
+        if (m_available) {
+            return true;
         }
+        if (m_loadFailed) {
+            return false;
+        }
+        if (!m_lib.isLoaded() && !m_lib.load()) {
+            m_loadFailed = true;
+            return false;
+        }
+        if (!m_init) {
+            m_init = reinterpret_cast<InitFn>(m_lib.resolve("nvmlInit_v2"));
+            m_shutdown = reinterpret_cast<ShutdownFn>(m_lib.resolve("nvmlShutdown"));
+            m_getHandle = reinterpret_cast<GetHandleByIndexFn>(m_lib.resolve("nvmlDeviceGetHandleByIndex_v2"));
+            m_getName = reinterpret_cast<GetNameFn>(m_lib.resolve("nvmlDeviceGetName"));
+            m_getUtil = reinterpret_cast<GetUtilFn>(m_lib.resolve("nvmlDeviceGetUtilizationRates"));
+            m_getTemp = reinterpret_cast<GetTempFn>(m_lib.resolve("nvmlDeviceGetTemperature"));
+        }
+        if (!m_init || !m_getHandle || !m_getName || !m_getUtil || !m_getTemp) {
+            m_loadFailed = true;
+            return false;
+        }
+        if (!m_initialized) {
+            if (m_init() != 0) {
+                return false;
+            }
+            m_initialized = true;
+        }
+        if (m_getHandle(0, &m_device) != 0 || !m_device) {
+            release();
+            return false;
+        }
+        m_available = true;
+        return true;
     }
 
     QLibrary m_lib;
     DeviceHandle m_device = nullptr;
+    InitFn m_init = nullptr;
     ShutdownFn m_shutdown = nullptr;
+    GetHandleByIndexFn m_getHandle = nullptr;
     GetNameFn m_getName = nullptr;
     GetUtilFn m_getUtil = nullptr;
     GetTempFn m_getTemp = nullptr;
     bool m_initialized = false;
     bool m_available = false;
+    bool m_loadFailed = false;
 };
 
 QString parseNvidiaName(const QByteArray& out) {
@@ -313,11 +354,21 @@ void Gpu::tick() {
     }
 }
 
+void Gpu::onStopped() {
+    NvmlClient::instance().release();
+}
+
 void Gpu::detectGpu() {
     if (m_detecting) {
         return;
     }
+    if (const QString procName = procNvidiaGpuName(); !procName.isEmpty()) {
+        setAutoType(Nvidia);
+        setName(procName);
+        return;
+    }
     if (const QString nvName = NvmlClient::instance().deviceName(); !nvName.isEmpty()) {
+        NvmlClient::instance().release();
         setAutoType(Nvidia);
         setName(nvName);
         return;

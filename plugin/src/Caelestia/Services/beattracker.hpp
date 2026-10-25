@@ -1,8 +1,16 @@
 #pragma once
 
 #include "audioprovider.hpp"
-#include <aubio/aubio.h>
 #include <qqmlintegration.h>
+
+using smpl_t = float;
+using uint_t = unsigned int;
+struct fvec_t {
+    uint_t length;
+    smpl_t* data;
+};
+struct _aubio_tempo_t;
+using aubio_tempo_t = _aubio_tempo_t;
 
 namespace caelestia::services {
 

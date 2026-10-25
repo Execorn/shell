@@ -142,13 +142,15 @@ Item {
 
                         sourceComponent: modelData.component
 
-                        Component.onCompleted: active = Qt.binding(() => {
+                        active: {
                             if (index === view.currentIndex)
                                 return true;
+                            if (view.contentWidth <= 0 || implicitWidth <= 0)
+                                return false;
                             const vx = Math.floor(view.visibleArea.xPosition * view.contentWidth);
                             const vex = Math.floor(vx + view.visibleArea.widthRatio * view.contentWidth);
                             return (vx >= x && vx <= x + implicitWidth) || (vex >= x && vex <= x + implicitWidth);
-                        })
+                        }
                     }
                 }
             }

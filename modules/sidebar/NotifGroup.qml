@@ -124,7 +124,6 @@ StyledRect {
                 radius: Tokens.rounding.full
 
                 Loader {
-                    asynchronous: true
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: sourceComponent === materialIconComp ? 1 : 0
                     sourceComponent: root.image ? imageComp : root.appIcon ? appIconComp : materialIconComp
@@ -132,7 +131,6 @@ StyledRect {
             }
 
             Loader {
-                asynchronous: true
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 active: root.appIcon && root.image

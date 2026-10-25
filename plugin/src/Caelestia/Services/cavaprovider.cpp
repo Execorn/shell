@@ -2,6 +2,7 @@
 
 #include "audiocollector.hpp"
 #include "audioprovider.hpp"
+#include <QLibrary>
 #include <cava/cavacore.h>
 #include <cstddef>
 #include <qloggingcategory.h>
@@ -10,6 +11,40 @@ Q_LOGGING_CATEGORY(lcCava, "caelestia.services.cava", QtInfoMsg)
 Q_LOGGING_CATEGORY(lcCavaProcessor, "caelestia.services.cava.processor", QtInfoMsg)
 
 namespace caelestia::services {
+
+namespace {
+
+struct CavaApi {
+    using CavaInitFn = struct cava_plan* (*)(int, unsigned int, int, int, double, int, int);
+    using CavaExecuteFn = void (*)(double*, int, double*, struct cava_plan*);
+    using CavaDestroyFn = void (*)(struct cava_plan*);
+
+    QLibrary lib{ QStringLiteral("cava"), 1 };
+    CavaInitFn cavaInit = nullptr;
+    CavaExecuteFn cavaExecute = nullptr;
+    CavaDestroyFn cavaDestroy = nullptr;
+    bool valid = false;
+
+    CavaApi() {
+        if (!lib.load()) {
+            lib.setFileName(QStringLiteral("libcava.so.1"));
+            if (!lib.load()) {
+                return;
+            }
+        }
+        cavaInit = reinterpret_cast<CavaInitFn>(lib.resolve("cava_init"));
+        cavaExecute = reinterpret_cast<CavaExecuteFn>(lib.resolve("cava_execute"));
+        cavaDestroy = reinterpret_cast<CavaDestroyFn>(lib.resolve("cava_destroy"));
+        valid = cavaInit && cavaExecute && cavaDestroy;
+    }
+
+    static const CavaApi& instance() {
+        static const CavaApi api;
+        return api;
+    }
+};
+
+} // namespace
 
 CavaProcessor::CavaProcessor(QObject* parent)
     : AudioProcessor(parent)
@@ -39,7 +74,7 @@ void CavaProcessor::process() {
     const int count = static_cast<int>(AudioCollector::instance().readChunk(m_in));
 
     // Process in data via cava
-    cava_execute(m_in, count, m_out, m_plan);
+    CavaApi::instance().cavaExecute(m_in, count, m_out, m_plan);
 
     // Apply monstercat filter
     QVector<double> values(m_bars);
@@ -85,7 +120,9 @@ void CavaProcessor::reload() {
 
 void CavaProcessor::cleanup() {
     if (m_plan) {
-        cava_destroy(m_plan);
+        if (CavaApi::instance().valid) {
+            CavaApi::instance().cavaDestroy(m_plan);
+        }
         m_plan = nullptr;
     }
 
@@ -100,7 +137,12 @@ void CavaProcessor::initCava() {
         return;
     }
 
-    m_plan = cava_init(m_bars, ac::SAMPLE_RATE, 1, 1, 0.85, 50, 10000);
+    const auto& api = CavaApi::instance();
+    if (!api.valid) {
+        return;
+    }
+
+    m_plan = api.cavaInit(m_bars, ac::SAMPLE_RATE, 1, 1, 0.85, 50, 10000);
     m_out = new double[static_cast<size_t>(m_bars)];
 }
 

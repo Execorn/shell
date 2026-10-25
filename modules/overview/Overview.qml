@@ -46,11 +46,11 @@ Scope {
                 target = "address:" + addr;
             }
         }
-        Hypr.dispatch("movetoworkspace " + wsId + "," + target);
+        Hypr.dispatch(Hypr.usingLua ? `hl.dsp.window.move({ window = "${target}", workspace = "${wsId}", follow = false })` : `movetoworkspace ${wsId},${target}`);
     }
 
     function clickCard(wsId) {
-        Hypr.dispatch("workspace " + wsId);
+        Hypr.dispatch(Hypr.usingLua ? `hl.dsp.focus({ workspace = "${wsId}" })` : `workspace ${wsId}`);
         root.active = false;
     }
 

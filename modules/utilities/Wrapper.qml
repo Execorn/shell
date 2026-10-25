@@ -77,7 +77,6 @@ Item {
         anchors.left: parent.left
         anchors.margins: Tokens.padding.large
 
-        asynchronous: true
         active: root.shouldBeActive || root.visible
 
         onActiveChanged: {

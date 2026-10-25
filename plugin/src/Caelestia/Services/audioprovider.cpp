@@ -13,9 +13,7 @@ namespace caelestia::services {
 AudioProcessor::AudioProcessor(QObject* parent)
     : QObject(parent) {}
 
-AudioProcessor::~AudioProcessor() {
-    stop();
-}
+AudioProcessor::~AudioProcessor() = default;
 
 void AudioProcessor::init() {
     m_timer = new QTimer(this);
@@ -31,7 +29,7 @@ void AudioProcessor::start() {
 }
 
 void AudioProcessor::stop() {
-    if (m_timer) {
+    if (m_timer && QThread::currentThread() == thread()) {
         m_timer->stop();
     }
     QMetaObject::invokeMethod(&AudioCollector::instance(), &AudioCollector::unref, Qt::QueuedConnection, this);
@@ -46,6 +44,9 @@ AudioProvider::~AudioProvider() {
     if (m_thread) {
         m_thread->quit();
         m_thread->wait();
+    }
+    if (m_processor) {
+        AudioCollector::instance().unref(m_processor);
     }
     auto* processor = m_processor;
     m_processor = nullptr;
@@ -62,6 +63,14 @@ void AudioProvider::init() {
     m_processor->moveToThread(m_thread);
 
     connect(m_thread, &QThread::started, m_processor, &AudioProcessor::init);
+    connect(
+        m_thread, &QThread::finished, m_processor,
+        [processor = m_processor]() {
+            if (auto* timer = processor->findChild<QTimer*>()) {
+                timer->stop();
+            }
+        },
+        Qt::DirectConnection);
 }
 
 void AudioProvider::start() {

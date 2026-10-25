@@ -21,8 +21,6 @@ qml_module(caelestia-services
     LIBRARIES
         Qt::DBus
         PkgConfig::Pipewire
-        PkgConfig::Aubio
-        PkgConfig::Cava
         Sensors::Sensors
         caelestia-core
         caelestia-config

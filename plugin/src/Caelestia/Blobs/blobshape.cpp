@@ -84,6 +84,11 @@ void BlobShape::componentComplete() {
 void BlobShape::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry) {
     QQuickItem::geometryChange(newGeometry, oldGeometry);
     updateCenteredDeformMatrix();
+    if (!isVisible()) {
+        m_pendingDx = 0;
+        m_pendingDy = 0;
+        return;
+    }
     if (m_group) {
         // Accumulate sub-pixel drift so slow movements don't desync the shader
         m_pendingDx += static_cast<float>(newGeometry.x() - oldGeometry.x());

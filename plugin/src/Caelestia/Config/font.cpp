@@ -23,9 +23,7 @@ QFont FontStyleBase::buildFont(const FontConfig* cfg, const QString& fallbackFam
     const int scaledSize = static_cast<int>(cfg->size() * scale);
     const int cappedSize = scaledSize > 0 ? scaledSize : 1;
     font.setPointSize(cappedSize);
-    font.setVariableAxis("opsz", static_cast<float>(cappedSize));
     font.setWeight(QFont::Weight(cfg->weight()));
-    font.setVariableAxis("wght", font.weight());
     font.setItalic(cfg->italic());
 
     const auto axes = cfg->vaxes();

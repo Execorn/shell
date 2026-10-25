@@ -2,9 +2,55 @@
 
 #include "audiocollector.hpp"
 #include "audioprovider.hpp"
-#include <aubio/aubio.h>
+#include <qlibrary.h>
 
 namespace caelestia::services {
+
+namespace {
+
+class AubioApi {
+public:
+    using NewTempoFn = aubio_tempo_t* (*)(const char*, uint_t, uint_t, uint_t);
+    using DelTempoFn = void (*)(aubio_tempo_t*);
+    using TempoDoFn = void (*)(aubio_tempo_t*, const fvec_t*, fvec_t*);
+    using TempoGetBpmFn = smpl_t (*)(aubio_tempo_t*);
+    using NewFvecFn = fvec_t* (*)(uint_t);
+    using DelFvecFn = void (*)(fvec_t*);
+
+    static const AubioApi& instance() {
+        static const AubioApi s_api;
+        return s_api;
+    }
+
+    [[nodiscard]] bool available() const { return m_available; }
+
+    NewTempoFn newTempo = nullptr;
+    DelTempoFn delTempo = nullptr;
+    TempoDoFn tempoDo = nullptr;
+    TempoGetBpmFn tempoGetBpm = nullptr;
+    NewFvecFn newFvec = nullptr;
+    DelFvecFn delFvec = nullptr;
+
+private:
+    AubioApi()
+        : m_lib(QStringLiteral("aubio"), 5) {
+        if (!m_lib.load()) {
+            return;
+        }
+        newTempo = reinterpret_cast<NewTempoFn>(m_lib.resolve("new_aubio_tempo"));
+        delTempo = reinterpret_cast<DelTempoFn>(m_lib.resolve("del_aubio_tempo"));
+        tempoDo = reinterpret_cast<TempoDoFn>(m_lib.resolve("aubio_tempo_do"));
+        tempoGetBpm = reinterpret_cast<TempoGetBpmFn>(m_lib.resolve("aubio_tempo_get_bpm"));
+        newFvec = reinterpret_cast<NewFvecFn>(m_lib.resolve("new_fvec"));
+        delFvec = reinterpret_cast<DelFvecFn>(m_lib.resolve("del_fvec"));
+        m_available = newTempo && delTempo && tempoDo && tempoGetBpm && newFvec && delFvec;
+    }
+
+    QLibrary m_lib;
+    bool m_available = false;
+};
+
+} // namespace
 
 BeatProcessor::BeatProcessor(QObject* parent)
     : AudioProcessor(parent)
@@ -13,40 +59,55 @@ BeatProcessor::BeatProcessor(QObject* parent)
     , m_out(nullptr) {}
 
 BeatProcessor::~BeatProcessor() {
+    if (!m_tempo && !m_in && !m_out) {
+        return;
+    }
+    const auto& api = AubioApi::instance();
+    if (!api.available()) {
+        return;
+    }
     if (m_tempo) {
-        del_aubio_tempo(m_tempo);
+        api.delTempo(m_tempo);
     }
     if (m_in) {
-        del_fvec(m_in);
+        api.delFvec(m_in);
     }
     if (m_out) {
-        del_fvec(m_out);
+        api.delFvec(m_out);
     }
 }
 
 void BeatProcessor::init() {
     AudioProcessor::init();
+    const auto& api = AubioApi::instance();
+    if (!api.available()) {
+        return;
+    }
     if (!m_tempo) {
-        m_tempo = new_aubio_tempo("default", 1024, ac::CHUNK_SIZE, ac::SAMPLE_RATE);
+        m_tempo = api.newTempo("default", 1024, ac::CHUNK_SIZE, ac::SAMPLE_RATE);
     }
     if (!m_in) {
-        m_in = new_fvec(ac::CHUNK_SIZE);
+        m_in = api.newFvec(ac::CHUNK_SIZE);
     }
     if (!m_out) {
-        m_out = new_fvec(2);
+        m_out = api.newFvec(2);
     }
 }
 
 void BeatProcessor::process() {
-    if (!m_tempo || !m_in) {
+    if (!m_tempo || !m_in || !m_out) {
+        return;
+    }
+    const auto& api = AubioApi::instance();
+    if (!api.available()) {
         return;
     }
 
     AudioCollector::instance().readChunk(m_in->data);
 
-    aubio_tempo_do(m_tempo, m_in, m_out);
+    api.tempoDo(m_tempo, m_in, m_out);
     if (!qFuzzyIsNull(m_out->data[0])) {
-        emit beat(aubio_tempo_get_bpm(m_tempo));
+        emit beat(api.tempoGetBpm(m_tempo));
     }
 }
 

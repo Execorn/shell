@@ -23,6 +23,7 @@ protected:
     void stop() final;
 
     virtual void tick() {}
+    virtual void onStopped() {}
 
 private:
     void applyInterval(int ms);

@@ -86,6 +86,7 @@ Column {
         required property list<string> command
 
         function exec(): void {
+            root.visibilities.session = false;
             if (!SessionManager.exec(command))
                 Quickshell.execDetached(command);
         }

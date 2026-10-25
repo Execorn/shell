@@ -1,5 +1,7 @@
 #include "imagecacher.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <qcryptographichash.h>
 #include <qdatetime.h>
 #include <qdir.h>
@@ -20,6 +22,10 @@ namespace caelestia::images {
 
 namespace {
 
+constexpr qsizetype kMaxHashCacheEntries = 512;
+constexpr qsizetype kMaxDiskCacheFiles = 256;
+constexpr qint64 kMaxDiskCacheBytes = 64LL * 1024 * 1024;
+
 struct CachedHashEntry {
     qint64 fileSize = -1;
     qint64 mtimeMsecs = -1;
@@ -34,6 +40,31 @@ QMutex& hashCacheMutex() {
 QHash<QString, CachedHashEntry>& hashCache() {
     static QHash<QString, CachedHashEntry> s_cache;
     return s_cache;
+}
+
+void pruneDiskCache(const QString& dirPath) {
+    QDir dir(dirPath);
+    if (!dir.exists()) {
+        return;
+    }
+
+    QFileInfoList files = dir.entryInfoList(
+        { QStringLiteral("*.png") }, QDir::Files | QDir::NoDotAndDotDot, QDir::Time);
+    qint64 totalBytes = 0;
+    for (const QFileInfo& fi : std::as_const(files)) {
+        totalBytes += fi.size();
+    }
+
+    if (files.size() <= kMaxDiskCacheFiles && totalBytes <= kMaxDiskCacheBytes) {
+        return;
+    }
+
+    // QDir::Time sorts newest first; remove oldest entries from the back.
+    while (!files.isEmpty() && (files.size() > kMaxDiskCacheFiles || totalBytes > kMaxDiskCacheBytes)) {
+        const QFileInfo oldest = files.takeLast();
+        totalBytes -= oldest.size();
+        QFile::remove(oldest.absoluteFilePath());
+    }
 }
 
 QString sha256sum(const QString& path) {
@@ -67,7 +98,11 @@ QString sha256sum(const QString& path) {
     const QString hex = QString::fromLatin1(hash.result().toHex());
     {
         QMutexLocker locker(&hashCacheMutex());
-        hashCache().insert(canonical, CachedHashEntry{ fsize, mtime, hex });
+        auto& cache = hashCache();
+        if (cache.size() >= kMaxHashCacheEntries) {
+            cache.erase(cache.begin());
+        }
+        cache.insert(canonical, CachedHashEntry{ fsize, mtime, hex });
     }
     return hex;
 }
@@ -230,6 +265,11 @@ void ImageCacher::saveToCache(const QString& cachePath, const QImage& image) {
         qCWarning(
             lcCacher, "Failed to save to %s: %s", qUtf8Printable(cachePath), qUtf8Printable(saveFile.errorString()));
         return;
+    }
+
+    static std::atomic<int> s_writesSincePrune{ 0 };
+    if ((++s_writesSincePrune % 16) == 1) {
+        pruneDiskCache(parent);
     }
 
     qCDebug(lcCacher).noquote() << "Saved to" << cachePath;

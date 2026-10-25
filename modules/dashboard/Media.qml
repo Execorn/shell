@@ -83,7 +83,6 @@ Item {
 
                 anchors.centerIn: parent
                 anchors.horizontalCenterOffset: -Tokens.padding.extraLarge * 2
-                asynchronous: true
                 active: opacity > 0
                 opacity: 0
 
@@ -130,7 +129,6 @@ Item {
                 id: content
 
                 anchors.fill: parent
-                asynchronous: true
                 active: opacity > 0
 
                 sourceComponent: RowLayout {

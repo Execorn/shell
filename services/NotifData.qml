@@ -14,12 +14,13 @@ QtObject {
     property bool popup
     property bool closed
     property var locks: new Set()
+    property int lockCount: 0
 
     property date time: new Date()
     property string timeStr: qsTr("now")
 
     readonly property Timer timeStrTimer: Timer {
-        running: !notif.closed && (notif.popup || Visibilities.bars.size > 0)
+        running: !notif.closed && (notif.popup || notif.lockCount > 0)
         repeat: true
         interval: notif.popup ? 5000 : 60000
         onTriggered: notif.updateTimeStr()
@@ -214,11 +215,16 @@ QtObject {
     }
 
     function lock(item: Item): void {
+        const wasEmpty = locks.size === 0;
         locks.add(item);
+        lockCount = locks.size;
+        if (wasEmpty)
+            updateTimeStr();
     }
 
     function unlock(item: Item): void {
         locks.delete(item);
+        lockCount = locks.size;
         if (closed)
             close();
     }
@@ -228,7 +234,7 @@ QtObject {
         if (locks.size === 0 && Notifs.list.includes(this)) {
             Notifs.list = Notifs.list.filter(n => n !== this);
             notification?.dismiss();
-            destroy();
+            Qt.callLater(() => destroy());
         }
     }
 

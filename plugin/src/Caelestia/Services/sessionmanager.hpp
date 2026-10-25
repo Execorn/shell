@@ -19,6 +19,7 @@ class SessionManager : public QObject {
 public:
     explicit SessionManager(QObject* parent = nullptr);
 
+    Q_INVOKABLE void lock();
     Q_INVOKABLE void logout();
     Q_INVOKABLE void suspend();
     Q_INVOKABLE void suspendThenHibernate();
@@ -41,12 +42,16 @@ private slots:
 
 private:
     [[nodiscard]] std::optional<QDBusConnection> getSystemBus() const;
+    [[nodiscard]] bool resolveSessionPath(QDBusConnection& bus);
     [[nodiscard]] bool queryHibernateAvailable() const;
     void call(const QString& path, const QString& iface, const QString& method, const QVariantList& args = {});
     void callManager(const QString& method);
     void callSession(const QString& method);
+    void fallbackCommand(const QString& method) const;
 
+    QString m_sessionId;
     QString m_sessionPath;
+    mutable std::optional<bool> m_hibernateAvailable;
 };
 
 } // namespace caelestia::services

@@ -43,7 +43,6 @@ Item {
         }
 
         Loader {
-            asynchronous: true
             Layout.alignment: Qt.AlignHCenter
 
             active: GlobalConfig.services.useTwelveHourClock

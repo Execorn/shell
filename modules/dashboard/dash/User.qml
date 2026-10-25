@@ -72,7 +72,6 @@ Item {
 
             Loader {
                 anchors.centerIn: parent
-                asynchronous: true
                 active: pfp.status !== Image.Ready
 
                 sourceComponent: MaterialIcon {
@@ -257,7 +256,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "select_window"
                 color: Colours.palette.m3onSecondaryContainer
-                fontStyle: wmText.font
+                fontStyle: Tokens.font.icon.small
             }
 
             StyledText {

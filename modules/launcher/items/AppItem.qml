@@ -127,7 +127,6 @@ Item {
         Loader {
             id: favouriteIcon
 
-            asynchronous: true
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
             active: root.modelData && !root.modelData.isGroup && !root.modelData.isBack && Strings.testRegexList(GlobalConfig.launcher.favouriteApps, root.modelData.id)

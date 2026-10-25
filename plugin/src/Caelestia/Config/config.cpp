@@ -20,8 +20,13 @@
 #include "winfoconfig.hpp"
 #include "themeconfig.hpp"
 
+#include <fcntl.h>
+#include <qdir.h>
+#include <qfileinfo.h>
+#include <qicon.h>
 #include <qqmlengine.h>
 #include <qstandardpaths.h>
+#include <unistd.h>
 
 namespace caelestia::config {
 
@@ -29,6 +34,31 @@ namespace {
 
 QString configDir() {
     return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/caelestia/");
+}
+
+void hardenStartupEnvironment() {
+    // Initialize the platform theme icon loader (KIconLoader / libKF6I18n) on the main
+    // GUI thread before QQuickPixmapReader spawns its worker thread.
+    (void)QIcon::fromTheme(QStringLiteral("application-x-executable")).pixmap(16, 16);
+
+    // libnvidia-egl-wayland opens /dev/dri/renderD128 with O_RDWR and without O_CLOEXEC
+    // during Wayland EGL initialization. Mark any /dev/dri/* descriptors FD_CLOEXEC so
+    // child processes (e.g. nmcli monitor) do not inherit DRM render node FDs.
+    const QDir fdDir(QStringLiteral("/proc/self/fd"));
+    const auto entries = fdDir.entryList(QDir::Files | QDir::System | QDir::NoDotAndDotDot);
+    for (const QString& entry : entries) {
+        bool ok = false;
+        const int fd = entry.toInt(&ok);
+        if (!ok || fd < 3)
+            continue;
+        const QString target = QFileInfo(fdDir.filePath(entry)).symLinkTarget();
+        if (target.startsWith(QStringLiteral("/dev/dri/"))) {
+            const int flags = fcntl(fd, F_GETFD);
+            if (flags >= 0 && !(flags & FD_CLOEXEC)) {
+                (void)fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
+            }
+        }
+    }
 }
 
 } // namespace
@@ -87,6 +117,11 @@ GlobalConfig::GlobalConfig(GlobalConfig* fallback, const QString& filePath, cons
 
 GlobalConfig* GlobalConfig::instance() {
     static GlobalConfig instance;
+    static const bool hardened = []() {
+        hardenStartupEnvironment();
+        return true;
+    }();
+    Q_UNUSED(hardened);
     instance.bindAppearanceTokens();
     return &instance;
 }

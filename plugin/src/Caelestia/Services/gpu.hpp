@@ -50,6 +50,7 @@ signals:
 
 protected:
     void tick() override;
+    void onStopped() override;
 
 private:
     void detectGpu();

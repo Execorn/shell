@@ -97,7 +97,6 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
 
-        asynchronous: true
         active: root.shouldBeActive || root.visible
 
         onActiveChanged: {

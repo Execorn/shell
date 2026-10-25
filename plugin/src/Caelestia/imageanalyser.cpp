@@ -51,6 +51,10 @@ void ImageAnalyser::setSource(const QString& source) {
     emit sourceChanged();
 
     if (m_sourceItem) {
+        QObject::disconnect(m_sourceItem, nullptr, this, nullptr);
+        if (m_sourceItem->window()) {
+            QObject::disconnect(m_sourceItem->window(), nullptr, this, nullptr);
+        }
         m_sourceItem = nullptr;
         emit sourceItemChanged();
     }
@@ -65,6 +69,13 @@ QQuickItem* ImageAnalyser::sourceItem() const {
 void ImageAnalyser::setSourceItem(QQuickItem* sourceItem) {
     if (m_sourceItem == sourceItem) {
         return;
+    }
+
+    if (m_sourceItem) {
+        QObject::disconnect(m_sourceItem, nullptr, this, nullptr);
+        if (m_sourceItem->window()) {
+            QObject::disconnect(m_sourceItem->window(), nullptr, this, nullptr);
+        }
     }
 
     m_sourceItem = sourceItem;

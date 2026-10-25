@@ -3,6 +3,7 @@
 #include "imagecacher.hpp"
 
 #include <qfileinfo.h>
+#include <qicon.h>
 #include <qimage.h>
 #include <qimagereader.h>
 #include <qloggingcategory.h>
@@ -104,6 +105,7 @@ private:
 
 CachingImageProvider::CachingImageProvider(FillMode fillMode)
     : m_fillMode(fillMode) {
+    (void)QIcon::fromTheme(QStringLiteral("application-x-executable")).pixmap(16, 16);
     (void)QThreadPool::globalInstance();
     (void)ImageCacher::instance();
 }

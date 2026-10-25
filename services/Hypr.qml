@@ -49,8 +49,67 @@ Singleton {
 
     signal configReloaded
 
+    function translateToLua(request: string): string {
+        const trimmed = request.trim();
+        if (!trimmed || trimmed.startsWith("hl."))
+            return trimmed;
+
+        const match = trimmed.match(/^([a-zA-Z0-9_-]+)(?:\s+(.*))?$/);
+        if (!match)
+            return trimmed;
+
+        const cmd = match[1];
+        const arg = (match[2] ?? "").trim();
+        const q = s => JSON.stringify(s);
+
+        switch (cmd) {
+        case "global":
+            return `hl.dsp.global(${q(arg)})`;
+        case "workspace":
+            return `hl.dsp.focus({ workspace = ${q(arg)} })`;
+        case "movetoworkspace": {
+            const parts = arg.split(",");
+            const ws = (parts[0] ?? "").trim();
+            const win = parts.slice(1).join(",").trim();
+            return win ? `hl.dsp.move_to({ workspace = ${q(ws)}, window = ${q(win)} })` : `hl.dsp.move_to({ workspace = ${q(ws)} })`;
+        }
+        case "movetoworkspacesilent": {
+            const parts = arg.split(",");
+            const ws = (parts[0] ?? "").trim();
+            const win = parts.slice(1).join(",").trim();
+            return win ? `hl.dsp.move_to({ workspace = ${q(ws)}, window = ${q(win)}, silent = true })` : `hl.dsp.move_to({ workspace = ${q(ws)}, silent = true })`;
+        }
+        case "focuswindow":
+            return `hl.dsp.focus({ window = ${q(arg)} })`;
+        case "focusmonitor":
+            return `hl.dsp.focus({ monitor = ${q(arg)} })`;
+        case "movefocus":
+            return `hl.dsp.focus({ direction = ${q(arg)} })`;
+        case "layoutmsg":
+            return `hl.dsp.layout(${q(arg)})`;
+        case "togglesplit":
+            return `hl.dsp.layout("togglesplit")`;
+        case "killactive":
+            return `hl.dsp.close_window()`;
+        case "togglefloating":
+            return `hl.dsp.float_window({ action = "toggle" })`;
+        case "fullscreen":
+            return arg === "1" ? `hl.dsp.fullscreen({ mode = "maximize", action = "toggle" })` : `hl.dsp.fullscreen({ mode = "fullscreen", action = "toggle" })`;
+        case "pin":
+            return `hl.dsp.pin_window({ action = "toggle" })`;
+        case "centerwindow":
+            return `hl.dsp.center_window()`;
+        case "togglespecialworkspace":
+            return `hl.dsp.toggle_special_workspace(${q(arg)})`;
+        case "exec":
+            return `hl.exec_cmd(${q(arg)})`;
+        default:
+            return trimmed;
+        }
+    }
+
     function dispatch(request: string): void {
-        Hyprland.dispatch(request);
+        Hyprland.dispatch(usingLua ? translateToLua(request) : request);
     }
 
     function cycleSpecialWorkspace(direction: string): void {
@@ -338,9 +397,9 @@ Singleton {
                     const activeT = root.activeToplevel;
                     const activeAddr = activeT?.lastIpcObject?.address ?? "";
                     if (activeAddr !== c1.address && activeAddr !== c2.address) {
-                        root.dispatch("focuswindow address:" + c1.address);
+                        root.dispatch(root.usingLua ? `hl.dsp.focus({ window = "address:${c1.address}" })` : "focuswindow address:" + c1.address);
                     }
-                    root.dispatch("layoutmsg togglesplit");
+                    root.dispatch(root.usingLua ? 'hl.dsp.layout("togglesplit")' : "layoutmsg togglesplit");
                     return; // Exit after one correction
                 }
             }

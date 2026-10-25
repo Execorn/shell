@@ -5,7 +5,27 @@
 #include <cmath>
 
 BlobRect::BlobRect(QQuickItem* parent)
-    : BlobShape(parent) {}
+    : BlobShape(parent) {
+    connect(this, &QQuickItem::visibleChanged, this, [this]() {
+        if (!isVisible()) {
+            m_hasPrevPos = false;
+            m_pendingDx = 0.0f;
+            m_pendingDy = 0.0f;
+            if (m_physicsActive || !m_deformMatrix.isIdentity()) {
+                m_dm00 = 1.0f;
+                m_dm01 = 0.0f;
+                m_dm11 = 1.0f;
+                m_dmVel00 = 0.0f;
+                m_dmVel01 = 0.0f;
+                m_dmVel11 = 0.0f;
+                m_deformMatrix = QMatrix4x4();
+                emit rawDeformMatrixChanged();
+                updateCenteredDeformMatrix();
+                m_physicsActive = false;
+            }
+        }
+    });
+}
 
 BlobRect::~BlobRect() {
     if (m_group)

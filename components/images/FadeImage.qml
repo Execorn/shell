@@ -20,6 +20,7 @@ Image {
     }
 
     asynchronous: true
+    cache: false
     fillMode: Image.PreserveAspectCrop
 
     sourceSize: {
@@ -64,7 +65,7 @@ Image {
             PropertyAction {
                 target: root
                 property: "hadPrevious"
-                value: root.source
+                value: root.source.toString().length > 0
             }
             PropertyAction {}
             ScriptAction {

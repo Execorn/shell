@@ -80,12 +80,13 @@ void BlobGroup::markDirty() {
 }
 
 void BlobGroup::markShapeDirty(BlobShape* source) {
+    if (!source || !source->isVisible())
+        return;
+
     m_physicsUpdated = false;
 
-    if (source->isVisible()) {
-        source->polish();
-        source->update();
-    }
+    source->polish();
+    source->update();
 
     // Use cached padded rects to find spatial neighbors
     const float pad = static_cast<float>(m_smoothing) * 2.0f;

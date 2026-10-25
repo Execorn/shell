@@ -61,7 +61,6 @@ ProgressBar {
 
     contentItem: Loader {
         anchors.fill: parent
-        asynchronous: true
         sourceComponent: root.indeterminate || root.indeterminateAnimState !== StyledProgressBar.Stopped ? indeterminateComp : determinateComp
     }
 

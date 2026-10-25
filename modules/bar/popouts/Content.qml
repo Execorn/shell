@@ -59,6 +59,17 @@ Item {
                 network: (networkPopout.item as Network)?.passwordNetwork ?? null
             }
 
+            Timer {
+                id: passwordDelayTimer
+
+                interval: 100
+                onTriggered: {
+                    if (passwordPopout.item && (networkPopout.item as Network)?.passwordNetwork) {
+                        (passwordPopout.item as WirelessPassword).network = (networkPopout.item as Network).passwordNetwork;
+                    }
+                }
+            }
+
             Connections {
                 function onCurrentNameChanged() {
                     // Update network immediately when password popout becomes active
@@ -69,12 +80,7 @@ Item {
                                 (passwordPopout.item as WirelessPassword).network = (networkPopout.item as Network).passwordNetwork;
                             }
                         }
-                        // Also try after a short delay in case networkPopout.item wasn't ready
-                        Qt.callLater(() => {
-                            if (passwordPopout.item && (networkPopout.item as Network)?.passwordNetwork) {
-                                (passwordPopout.item as WirelessPassword).network = (networkPopout.item as Network).passwordNetwork;
-                            }
-                        }, 100);
+                        passwordDelayTimer.restart();
                     }
                 }
 
@@ -156,7 +162,7 @@ Item {
 
                     TrayMenu {
                         popouts: root.popouts
-                        trayItem: trayMenu.modelData.menu // qmllint disable unresolved-type
+                        trayItem: trayMenu.modelData?.menu ?? null // qmllint disable unresolved-type
                     }
                 }
             }
