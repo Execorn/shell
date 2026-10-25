@@ -6,7 +6,7 @@ namespace caelestia::services {
 
 class LyricsBackend : public QObject {
     Q_OBJECT
-    QML_ELEMENT
+    QML_NAMED_ELEMENT(LyricsBackend)
     QML_SINGLETON
 
 public:

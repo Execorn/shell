@@ -29,6 +29,7 @@ QString Qalculator::eval(const QString& expr, bool printExpr) const {
 
     EvaluationOptions eo;
     PrintOptions po;
+    po.interval_display = INTERVAL_DISPLAY_SIGNIFICANT_DIGITS;
 
     std::string parsed;
     std::string result = CALCULATOR->calculateAndPrint(
@@ -86,6 +87,7 @@ void Qalculator::evalAsync(const QString& expr) {
 
         EvaluationOptions eo;
         PrintOptions po;
+        po.interval_display = INTERVAL_DISPLAY_SIGNIFICANT_DIGITS;
 
         std::string parsed;
         std::string result = CALCULATOR->calculateAndPrint(

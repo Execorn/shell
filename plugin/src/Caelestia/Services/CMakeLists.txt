@@ -19,6 +19,7 @@ qml_module(caelestia-services
         lyrics.cpp
         sessionmanager.cpp
     LIBRARIES
+        Qt::Concurrent
         Qt::DBus
         PkgConfig::Pipewire
         Sensors::Sensors

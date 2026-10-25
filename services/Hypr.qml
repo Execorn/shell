@@ -45,6 +45,7 @@ Singleton {
     readonly property alias devices: extras.devices
 
     property bool hadKeyboard
+    property string lastKbLayoutFull: ""
     property string lastSpecialWorkspace: ""
 
     signal configReloaded
@@ -155,12 +156,13 @@ Singleton {
 
     function reloadDynamicConfs(): void {
         if (usingLua) {
-            extras.batchMessage(['eval hl.bind("Caps_Lock", hl.dsp.global("caelestia:refreshDevices"), { locked = true, non_consuming = true, ignore_mods = true, release = true })', 'eval hl.bind("Num_Lock", hl.dsp.global("caelestia:refreshDevices"), { locked = true, non_consuming = true, ignore_mods = true, release = true })']);
+            extras.batchMessage(['eval hl.bind("Caps_Lock", hl.dsp.global("caelestia:refreshDevices"), { locked = true, non_consuming = true, ignore_mods = true, release = true })', 'eval hl.bind("Num_Lock", hl.dsp.global("caelestia:refreshDevices"), { locked = true, non_consuming = true, ignore_mods = true, release = true })', 'eval hl.bind("code:66", hl.dsp.global("caelestia:refreshDevices"), { locked = true, non_consuming = true, ignore_mods = true, release = true })']);
         } else {
-            extras.batchMessage(["keyword bindlni ,Caps_Lock,global,caelestia:refreshDevices", "keyword bindlni ,Num_Lock,global,caelestia:refreshDevices"]);
+            extras.batchMessage(["keyword bindlni ,Caps_Lock,global,caelestia:refreshDevices", "keyword bindlni ,Num_Lock,global,caelestia:refreshDevices", "keyword bindlni ,code:66,global,caelestia:refreshDevices"]);
         }
     }
 
+    onUsingLuaChanged: reloadDynamicConfs()
     Component.onCompleted: reloadDynamicConfs()
 
     onCapsLockChanged: {
@@ -184,7 +186,7 @@ Singleton {
     }
 
     onKbLayoutFullChanged: {
-        if (hadKeyboard && GlobalConfig.utilities.toasts.kbLayoutChanged) {
+        if (hadKeyboard && kbLayoutFull && kbLayoutFull !== "Unknown" && kbLayoutFull !== lastKbLayoutFull && GlobalConfig.utilities.toasts.kbLayoutChanged) {
             for (let i = 0; i < Toaster.toasts.length; i++) {
                 const t = Toaster.toasts[i];
                 if (t.title === qsTr("Keyboard layout changed") && !t.closed) {
@@ -193,6 +195,9 @@ Singleton {
             }
             Toaster.toast(qsTr("Keyboard layout changed"), qsTr("Layout changed to: %1").arg(kbLayoutFull), "keyboard");
         }
+
+        if (kbLayoutFull && kbLayoutFull !== "Unknown")
+            lastKbLayoutFull = kbLayoutFull;
 
         hadKeyboard = !!keyboard;
     }

@@ -10,7 +10,7 @@ namespace caelestia::services {
 
 class Gpu : public TickingService {
     Q_OBJECT
-    QML_ELEMENT
+    QML_NAMED_ELEMENT(Gpu)
     QML_SINGLETON
 
 public:

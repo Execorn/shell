@@ -42,15 +42,17 @@ MouseArea {
             return [];
 
         const special = mon.lastIpcObject?.specialWorkspace;
-        const wsId = special?.name ? special?.id : mon.activeWorkspace?.id;
+        const wsId = special?.name ? special.id : mon.activeWorkspace?.id;
+        if (wsId === undefined)
+            return [];
 
         return Hypr.toplevels.values.filter(c => c.workspace?.id === wsId).sort((a, b) => {
             // Pinned first, then fullscreen, then floating, then any other
             const ac = a?.lastIpcObject;
             const bc = b?.lastIpcObject;
-            return ((bc?.pinned ?? 0) - (ac?.pinned ?? 0))
-                || (((bc?.fullscreen ?? 0) !== 0) - ((ac?.fullscreen ?? 0) !== 0))
-                || ((bc?.floating ?? 0) - (ac?.floating ?? 0));
+            if (!ac || !bc)
+                return !ac - !bc;
+            return (bc.pinned - ac.pinned) || ((bc.fullscreen !== 0) - (ac.fullscreen !== 0)) || (bc.floating - ac.floating);
         });
     }
 
@@ -59,10 +61,14 @@ MouseArea {
             if (!client)
                 continue;
 
+            const ipc = client.lastIpcObject;
+            if (!ipc?.at || !ipc?.size)
+                continue;
+
             let {
                 at: [cx, cy],
                 size: [cw, ch]
-            } = client.lastIpcObject;
+            } = ipc;
             cx -= screen.x;
             cy -= screen.y;
             if (cx <= x && cy <= y && cx + cw >= x && cy + ch >= y) {
@@ -106,15 +112,15 @@ MouseArea {
 
         opacity = 1;
 
-        const c = clients[0];
-        if (c) {
-            const cx = c.lastIpcObject.at[0] - screen.x;
-            const cy = c.lastIpcObject.at[1] - screen.y;
+        const ipc = clients[0]?.lastIpcObject;
+        if (ipc?.at && ipc?.size) {
+            const cx = ipc.at[0] - screen.x;
+            const cy = ipc.at[1] - screen.y;
             onClient = true;
             sx = cx;
             sy = cy;
-            ex = cx + c.lastIpcObject.size[0];
-            ey = cy + c.lastIpcObject.size[1];
+            ex = cx + ipc.size[0];
+            ey = cy + ipc.size[1];
         } else {
             sx = screen.width / 2 - 100;
             sy = screen.height / 2 - 100;

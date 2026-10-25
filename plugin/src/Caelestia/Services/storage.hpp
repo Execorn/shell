@@ -3,7 +3,11 @@
 #include "diskinfo.hpp"
 #include "tickingservice.hpp"
 
+#include <qbytearray.h>
 #include <qbytearrayview.h>
+#include <qfuturewatcher.h>
+#include <qhash.h>
+#include <qpointer.h>
 #include <qqmlintegration.h>
 #include <qqmllist.h>
 #include <qvariant.h>
@@ -40,6 +44,27 @@ protected:
     void tick() override;
 
 private:
+    struct Accum {
+        quint64 usedBytes = 0;
+        quint64 totalBytes = 0;
+        bool hasRoot = false;
+    };
+
+    using AccumHash = QHash<QString, Accum>;
+
+    struct DeviceEntry {
+        quint64 totalBytes = 0;
+        quint64 usedBytes = 0;
+        bool hasRoot = false;
+        QByteArray device;
+        QByteArray fsType;
+    };
+
+    [[nodiscard]] static QHash<QByteArray, DeviceEntry> collectDevices();
+    [[nodiscard]] static AccumHash foldToDisks(const QHash<QByteArray, DeviceEntry>& byDevice);
+
+    void applyDisks(const AccumHash& byDisk);
+
     [[nodiscard]] static QStringList resolveToPhysicalDisks(const QString& devicePath);
     [[nodiscard]] static bool isPseudoFs(QByteArrayView fsType);
     [[nodiscard]] static bool sameOrder(const QList<DiskInfo*>& a, const QList<DiskInfo*>& b);
@@ -49,6 +74,7 @@ private:
 
     QList<DiskInfo*> m_disks;
     QPointer<DiskInfo> m_manualPrimaryDisk;
+    QFutureWatcher<AccumHash>* const m_futureWatcher;
 };
 
 } // namespace caelestia::services

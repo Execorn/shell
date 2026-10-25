@@ -194,6 +194,16 @@ Singleton {
         }
     }
 
+    // qmllint disable unresolved-type
+    CustomShortcut {
+        // qmllint enable unresolved-type
+        name: "toggleDnd"
+        description: "Toggle do not disturb"
+        onPressed: {
+            props.dnd = !props.dnd;
+        }
+    }
+
     IpcHandler {
         function clear(): void {
             for (const notif of root.list.slice())

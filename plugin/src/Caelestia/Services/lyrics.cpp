@@ -304,6 +304,10 @@ void Lyrics::setLines(QVector<LyricLine> lines, LyricsBackend::Backend source) {
 }
 
 void Lyrics::clearLines() {
+    if (!m_hasLyrics) {
+        return;
+    }
+
     // Doesn't actually clear lines, set a flag instead so anims can run
     m_hasLyrics = false;
     emit hasLyricsChanged();
@@ -510,7 +514,9 @@ void Lyrics::tryLrclib(int reqId) {
     if (!m_album.isEmpty()) {
         q.addQueryItem(u"album_name"_s, m_album);
     }
-    if (m_duration > 0) {
+
+    constexpr qreal kMaxDurationSecs = std::numeric_limits<int>::max();
+    if (m_duration > 0 && qIsFinite(m_duration) && m_duration < kMaxDurationSecs) {
         q.addQueryItem(u"duration"_s, QString::number(qRound(m_duration)));
     }
     url.setQuery(q);

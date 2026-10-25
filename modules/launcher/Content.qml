@@ -143,7 +143,7 @@ Item {
 
             Connections {
                 function onLauncherChanged(): void {
-                    if (!root.visibilities.launcher)
+                    if (root.visibilities.launcher)
                         search.text = "";
                 }
 

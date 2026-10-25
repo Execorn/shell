@@ -64,6 +64,7 @@ Singleton {
         return list[0] ?? null;
     }
     property alias manualActive: props.manualActive
+    property string lastNowPlayingKey: ""
 
     Variants {
         model: root.list
@@ -109,14 +110,42 @@ Singleton {
         return "";
     }
 
+    // Quickshell only emits postTrackChanged when trackid/url/title change, so late
+    // artist updates (common with mpv-mpris + yt-dlp) never retrigger it.
+    function maybeToastNowPlaying(): void {
+        if (!GlobalConfig.utilities.toasts.nowPlaying)
+            return;
+
+        const player = root.active;
+        if (!player)
+            return;
+
+        const title = player.trackTitle ?? "";
+        const artist = player.trackArtist ?? "";
+        if (!title || !artist)
+            return;
+
+        const key = `${getIdentity(player)}\0${player.uniqueId}\0${title}\0${artist}`;
+        if (key === lastNowPlayingKey)
+            return;
+
+        lastNowPlayingKey = key;
+        Toaster.toast(qsTr("Now Playing"), qsTr("%1 - %2").arg(artist).arg(title), "music_note");
+    }
+
+    onActiveChanged: lastNowPlayingKey = ""
+
     Connections {
-        function onPostTrackChanged() {
-            if (!GlobalConfig.utilities.toasts.nowPlaying) {
-                return;
-            }
-            if (root.active.trackArtist != "" && root.active.trackTitle != "") {
-                Toaster.toast(qsTr("Now Playing"), qsTr("%1 - %2").arg(root.active.trackArtist).arg(root.active.trackTitle), "music_note");
-            }
+        function onPostTrackChanged(): void {
+            root.maybeToastNowPlaying();
+        }
+
+        function onTrackTitleChanged(): void {
+            root.maybeToastNowPlaying();
+        }
+
+        function onTrackArtistChanged(): void {
+            root.maybeToastNowPlaying();
         }
 
         target: root.active

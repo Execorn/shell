@@ -57,19 +57,18 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
     }
 
     const QSharedPointer<const QQuickItemGrabResult> grabResult = target->grabToImage();
+    if (!grabResult) {
+        qCWarning(lcCUtils) << "saveItem: failed to grab" << target;
+        return;
+    }
 
-    QObject::connect(grabResult.data(), &QQuickItemGrabResult::ready, this,
+    QObject::connect(
+        grabResult.data(), &QQuickItemGrabResult::ready, this,
         [grabResult, scaledRect, path, onSaved, onFailed, this]() {
-            const auto future = QtConcurrent::run([=]() {
-                QImage image = grabResult->image();
-
-                if (scaledRect.isValid()) {
-                    image = image.copy(scaledRect);
-                }
-
-                const QString file = path.toLocalFile();
+            const auto future = QtConcurrent::run([image = grabResult->image(), scaledRect, file = path.toLocalFile()]() {
+                const QImage img = scaledRect.isValid() ? image.copy(scaledRect) : image;
                 const QString parent = QFileInfo(file).absolutePath();
-                return QDir().mkpath(parent) && image.save(file);
+                return QDir().mkpath(parent) && img.save(file);
             });
 
             auto* watcher = new QFutureWatcher<bool>(this);
@@ -97,7 +96,8 @@ void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, Q
                 watcher->deleteLater();
             });
             watcher->setFuture(future);
-        });
+        },
+        Qt::SingleShotConnection);
 }
 
 bool CUtils::copyFile(const QUrl& source, const QUrl& target, bool overwrite) {

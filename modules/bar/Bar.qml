@@ -44,7 +44,9 @@ ColumnLayout {
         for (let i = 0; i < repeater.count; i++) {
             const loader = repeater.itemAt(i) as WrappedLoader;
             if (loader?.enabled && loader.entryId === "tray") {
-                (loader.item as Tray).expanded = false;
+                const tray = loader.item as Tray;
+                if (tray)
+                    tray.expanded = false;
             }
         }
     }

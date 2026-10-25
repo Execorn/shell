@@ -95,7 +95,7 @@ StyledListView {
     Connections {
         target: root.visibilities
         function onLauncherChanged(): void {
-            if (!root.visibilities.launcher)
+            if (root.visibilities.launcher)
                 root.activeGroup = null;
         }
     }
@@ -220,7 +220,8 @@ StyledListView {
             } else {
                 root.currentIndex = root.savedGroupIndex;
                 Qt.callLater(function() {
-                    root.positionViewAtIndex(root.savedGroupIndex, ListView.Contain);
+                    if (root.visibilities.launcher)
+                        root.positionViewAtIndex(root.savedGroupIndex, ListView.Contain);
                 });
             }
         }

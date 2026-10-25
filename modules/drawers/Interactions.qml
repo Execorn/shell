@@ -22,6 +22,7 @@ CustomMouseArea {
     property bool dashboardShortcutActive
     property bool osdShortcutActive
     property bool utilitiesShortcutActive
+    property bool sidebarShortcutActive
 
     function withinPanelHeight(panel: Item, x: real, y: real): bool {
         const panelY = root.borderThickness + panel.y;
@@ -86,7 +87,7 @@ CustomMouseArea {
             if (Config.bar.showOnHover)
                 bar.isHovered = false;
 
-            if (Config.sidebar.showOnHover)
+            if (Config.sidebar.showOnHover && !sidebarShortcutActive)
                 visibilities.sidebar = false;
         }
     }
@@ -184,10 +185,12 @@ CustomMouseArea {
                 const showSidebarHover = x > Math.min(width - Config.border.minThickness, bar.implicitWidth + panels.sidebar.x) && y <= sidebarTriggerY;
                 if (showSidebarHover && !visibilities.sidebar) {
                     visibilities.sidebar = true;
-                } else {
-                    const inSidebarArea = inRightPanel(panels.sidebar, x, y) || inRightPanel(panels.sessionWrapper, x, y);
+                } else if (!sidebarShortcutActive) {
+                    const inSidebarArea = inRightPanel(panels.sidebar, x, y) || inRightPanel(panels.sessionWrapper, x, y) || inRightPanel(panels.utilities, x, y);
                     if (!inSidebarArea)
                         visibilities.sidebar = false;
+                } else if (showSidebarHover) {
+                    sidebarShortcutActive = false;
                 }
             }
 
@@ -254,6 +257,7 @@ CustomMouseArea {
                 root.dashboardShortcutActive = false;
                 root.osdShortcutActive = false;
                 root.utilitiesShortcutActive = false;
+                root.sidebarShortcutActive = false;
 
                 // Also hide dashboard and OSD if they're not being hovered
                 const inDashboardArea = root.inTopPanel(root.panels.dashboard, root.mouseX, root.mouseY);
@@ -305,6 +309,16 @@ CustomMouseArea {
             } else {
                 // Utilities hidden, clear shortcut flag
                 root.utilitiesShortcutActive = false;
+            }
+        }
+
+        function onSidebarChanged() {
+            if (root.visibilities.sidebar) {
+                const inSidebarArea = root.inRightPanel(root.panels.sidebar, root.mouseX, root.mouseY) || root.inRightPanel(root.panels.sessionWrapper, root.mouseX, root.mouseY) || root.inRightPanel(root.panels.utilities, root.mouseX, root.mouseY);
+                if (!inSidebarArea)
+                    root.sidebarShortcutActive = true;
+            } else {
+                root.sidebarShortcutActive = false;
             }
         }
 

@@ -3,6 +3,7 @@
 /.qmlls.ini
 build/
 .cache/
+.pytest_cache/
 logs
 __pycache__/
 *.pyc
