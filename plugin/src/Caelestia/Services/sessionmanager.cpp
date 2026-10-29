@@ -290,7 +290,7 @@ void SessionManager::fallbackCommand(const QString& method) const {
             QProcess::startDetached(
                 u"systemd-run"_s, { u"--user"_s, u"--quiet"_s, u"--collect"_s, u"loginctl"_s, u"terminate-session"_s, m_sessionId });
         } else {
-            QProcess::startDetached(u"hyprctl"_s, { u"dispatch"_s, u"exit"_s });
+            QProcess::startDetached(u"hyprctl"_s, { u"dispatch"_s, u"hl.dsp.exit()"_s });
         }
     }
 }

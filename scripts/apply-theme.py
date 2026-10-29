@@ -210,14 +210,20 @@ def main():
     force_fallback = os.environ.get("FORCE_COLOR_FALLBACK") == "1"
     if shutil.which("matugen") and not force_fallback:
         print("matugen found. Running matugen color extraction...")
-        # Since matugen configuration can vary, we call standard image generation.
-        # But we must ensure scheme.json and current.conf are written correctly.
-        # In a real environment we assume matugen writes it or we can run it.
-        # We also mock this in tests.
-        subprocess.run(["matugen", "image", wallpaper_path], check=True)
+        subprocess.run(["matugen", "image", "-m", "dark", wallpaper_path], check=True)
     elif shutil.which("caelestia") and not force_fallback:
-        print("caelestia found. Running caelestia wallpaper extraction...")
-        subprocess.run(["caelestia", "wallpaper", "-f", wallpaper_path], check=True)
+        print("caelestia found. Running caelestia wallpaper extraction (forced dark mode)...")
+        if os.path.exists(scheme_json_path):
+            try:
+                with open(scheme_json_path, "r") as sf:
+                    cur_scheme = json.load(sf)
+                if cur_scheme.get("mode") != "dark":
+                    cur_scheme["mode"] = "dark"
+                    with open(scheme_json_path, "w") as sf:
+                        json.dump(cur_scheme, sf)
+            except Exception:
+                pass
+        subprocess.run(["caelestia", "wallpaper", "--no-smart", "-f", wallpaper_path], check=True)
     else:
         print("Neither matugen nor caelestia available. Running custom Pillow clustering fallback...")
         try:
@@ -311,14 +317,36 @@ def main():
     if shutil.which("hyprctl"):
         print("Injecting colors into Hyprland active instances...")
         try:
-            subprocess.run(
-                [
-                    "hyprctl",
-                    "--batch",
-                    f"keyword general:col.active_border rgba({primary}e6) ; keyword general:col.inactive_border rgba({onSurfaceVariant}11)",
-                ],
-                check=True,
+            status_proc = subprocess.run(
+                ["hyprctl", "-j", "status"],
+                capture_output=True,
+                text=True,
+                check=False,
             )
+            using_lua = False
+            if status_proc.returncode == 0 and status_proc.stdout.strip():
+                try:
+                    using_lua = json.loads(status_proc.stdout).get("configProvider") == "lua"
+                except Exception:
+                    using_lua = False
+            if using_lua:
+                subprocess.run(
+                    [
+                        "hyprctl",
+                        "eval",
+                        f'hl.config({{ general = {{ col = {{ active_border = "rgba({primary}e6)", inactive_border = "rgba({onSurfaceVariant}11)" }} }} }})',
+                    ],
+                    check=True,
+                )
+            else:
+                subprocess.run(
+                    [
+                        "hyprctl",
+                        "--batch",
+                        f"keyword general:col.active_border rgba({primary}e6) ; keyword general:col.inactive_border rgba({onSurfaceVariant}11)",
+                    ],
+                    check=True,
+                )
         except Exception as e:
             print(f"Warning: hyprctl command failed: {e}", file=sys.stderr)
 

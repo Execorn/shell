@@ -139,12 +139,24 @@ Item {
                 }
             }
 
-            Component.onCompleted: forceActiveFocus()
+            Component.onCompleted: {
+                forceActiveFocus();
+                if (Wallpapers.openInWallpaperMode) {
+                    Wallpapers.openInWallpaperMode = false;
+                    search.text = `${GlobalConfig.launcher.actionPrefix}wallpaper `;
+                }
+            }
 
             Connections {
                 function onLauncherChanged(): void {
-                    if (root.visibilities.launcher)
-                        search.text = "";
+                    if (root.visibilities.launcher) {
+                        if (Wallpapers.openInWallpaperMode) {
+                            Wallpapers.openInWallpaperMode = false;
+                            search.text = `${GlobalConfig.launcher.actionPrefix}wallpaper `;
+                        } else {
+                            search.text = "";
+                        }
+                    }
                 }
 
                 function onSessionChanged(): void {
@@ -153,6 +165,33 @@ Item {
                 }
 
                 target: root.visibilities
+            }
+
+            Connections {
+                function onCarouselOpenRequested(): void {
+                    if (root.visibilities.launcher) {
+                        Wallpapers.openInWallpaperMode = false;
+                        search.text = `${GlobalConfig.launcher.actionPrefix}wallpaper `;
+                        search.forceActiveFocus();
+                    }
+                }
+
+                function onCarouselStepRequested(delta: int): void {
+                    if (root.visibilities.launcher && list.showWallpapers) {
+                        if (delta > 0)
+                            list.currentList?.incrementCurrentIndex();
+                        else
+                            list.currentList?.decrementCurrentIndex();
+                    }
+                }
+
+                function onCarouselAcceptRequested(): void {
+                    if (root.visibilities.launcher && list.showWallpapers) {
+                        search.accepted();
+                    }
+                }
+
+                target: Wallpapers
             }
         }
 

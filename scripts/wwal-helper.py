@@ -87,7 +87,8 @@ def apply_image(path, effect, duration, fps=60, scaling="fill", pos="center"):
         "--transition-duration", str(duration),
         "--transition-fps", str(fps),
         "--scaling-mode", str(scaling),
-        "--transition-pos", str(pos)
+        "--transition-pos", str(pos),
+        "--dark"
     ]
     try:
         res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2.0)

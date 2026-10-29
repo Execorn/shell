@@ -12,7 +12,7 @@ Searcher {
     id: root
 
     readonly property string currentNamePath: `${Paths.state}/wallpaper/path.txt`
-    readonly property list<string> smartArg: GlobalConfig.services.smartScheme ? [] : ["--no-smart"]
+    readonly property list<string> smartArg: ["--no-smart"]
     readonly property string fallback: Quickshell.shellPath("assets/wallpaper.webp")
 
     property bool showPreview: false
@@ -28,6 +28,11 @@ Searcher {
     property int slideshowIntervalSec: 300
     property string slideshowEffect: "random"
     property bool initialBootHandled: false
+    property bool openInWallpaperMode: false
+
+    signal carouselOpenRequested()
+    signal carouselStepRequested(int delta)
+    signal carouselAcceptRequested()
     property bool configLoaded: false
     property bool pathLoaded: false
     property bool randomPending: false
@@ -211,6 +216,21 @@ Searcher {
             return root.list.map(w => w.path).join("\n");
         }
 
+        function openCarousel(): void {
+            root.openInWallpaperMode = true;
+            const visibilities = Visibilities.getForActive();
+            visibilities.launcher = true;
+            root.carouselOpenRequested();
+        }
+
+        function stepCarousel(delta: int): void {
+            root.carouselStepRequested(delta);
+        }
+
+        function acceptCarousel(): void {
+            root.carouselAcceptRequested();
+        }
+
         target: "wallpaper"
     }
 
@@ -300,10 +320,11 @@ Searcher {
     Process {
         id: getPreviewColoursProc
 
-        command: ["caelestia", "wallpaper", "-p", root.previewPath, ...root.smartArg]
+        command: ["caelestia", "wallpaper", "-p", root.previewPath, "--no-smart"]
         stdout: StdioCollector {
             onStreamFinished: {
                 Colours.load(text, true);
+                Colours.previewLight = false;
                 Colours.showPreview = true;
             }
         }

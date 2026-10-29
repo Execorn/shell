@@ -72,13 +72,13 @@ Singleton {
             const parts = arg.split(",");
             const ws = (parts[0] ?? "").trim();
             const win = parts.slice(1).join(",").trim();
-            return win ? `hl.dsp.move_to({ workspace = ${q(ws)}, window = ${q(win)} })` : `hl.dsp.move_to({ workspace = ${q(ws)} })`;
+            return win ? `hl.dsp.window.move({ workspace = ${q(ws)}, window = ${q(win)}, follow = true })` : `hl.dsp.window.move({ workspace = ${q(ws)}, follow = true })`;
         }
         case "movetoworkspacesilent": {
             const parts = arg.split(",");
             const ws = (parts[0] ?? "").trim();
             const win = parts.slice(1).join(",").trim();
-            return win ? `hl.dsp.move_to({ workspace = ${q(ws)}, window = ${q(win)}, silent = true })` : `hl.dsp.move_to({ workspace = ${q(ws)}, silent = true })`;
+            return win ? `hl.dsp.window.move({ workspace = ${q(ws)}, window = ${q(win)}, follow = false })` : `hl.dsp.window.move({ workspace = ${q(ws)}, follow = false })`;
         }
         case "focuswindow":
             return `hl.dsp.focus({ window = ${q(arg)} })`;
@@ -91,19 +91,19 @@ Singleton {
         case "togglesplit":
             return `hl.dsp.layout("togglesplit")`;
         case "killactive":
-            return `hl.dsp.close_window()`;
+            return `hl.dsp.window.close()`;
         case "togglefloating":
-            return `hl.dsp.float_window({ action = "toggle" })`;
+            return `hl.dsp.window.float({ action = "toggle" })`;
         case "fullscreen":
-            return arg === "1" ? `hl.dsp.fullscreen({ mode = "maximize", action = "toggle" })` : `hl.dsp.fullscreen({ mode = "fullscreen", action = "toggle" })`;
+            return arg === "1" ? `hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })` : `hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" })`;
         case "pin":
-            return `hl.dsp.pin_window({ action = "toggle" })`;
+            return `hl.dsp.window.pin({ action = "toggle" })`;
         case "centerwindow":
-            return `hl.dsp.center_window()`;
+            return `hl.dsp.window.center()`;
         case "togglespecialworkspace":
-            return `hl.dsp.toggle_special_workspace(${q(arg)})`;
+            return `hl.dsp.workspace.toggle_special(${q(arg)})`;
         case "exec":
-            return `hl.exec_cmd(${q(arg)})`;
+            return `hl.dsp.exec_cmd(${q(arg)})`;
         default:
             return trimmed;
         }
