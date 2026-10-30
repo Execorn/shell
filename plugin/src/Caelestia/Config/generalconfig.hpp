@@ -31,20 +31,16 @@ class GeneralIdle : public ConfigObject {
     CONFIG_GLOBAL_PROPERTY(bool, lockBeforeSleep, true)
     CONFIG_GLOBAL_PROPERTY(bool, inhibitWhenAudio, true)
     CONFIG_GLOBAL_PROPERTY(bool, inhibitWhenCharging, false)
+    // Do not enable "dpms off" or "suspendThenHibernate" in default idle timeouts.
+    // On NVIDIA + VLI USB-C DisplayPort MST hubs, powering down the DP links (D3)
+    // invalidates the MST virtual display IDs (0x4000 / 0x8000) in nvidia-modeset,
+    // which causes subsequent "dpms on" atomic KMS commits to hang across all
+    // displays (including eDP-1) and leaves the MST hub dead until physically replugged.
     CONFIG_GLOBAL_PROPERTY(QVariantList, timeouts,
         {
             vmap({
-                { u"timeout"_s, 180 },
+                { u"timeout"_s, 1500 },
                 { u"idleAction"_s, u"lock"_s },
-            }),
-            vmap({
-                { u"timeout"_s, 300 },
-                { u"idleAction"_s, u"dpms off"_s },
-                { u"returnAction"_s, u"dpms on"_s },
-            }),
-            vmap({
-                { u"timeout"_s, 600 },
-                { u"idleAction"_s, QStringList{ u"suspendThenHibernate"_s } },
             }),
         })
 

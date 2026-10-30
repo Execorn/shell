@@ -54,6 +54,13 @@ Scope {
         target: SessionManager
     }
 
+    // Do not configure "dpms off" timeouts in shell.json on this system.
+    // Sending DP_SET_POWER_D3 to the external monitors causes the VLI USB-C MST
+    // hub to tear down its virtual DisplayPort sink IDs (logging
+    // "nvidia-modeset: ERROR: GPU:0: nvHandleCpEventDeferredWork: displayId 0x4000 invalid").
+    // Subsequent "dpms on" atomic KMS commits then stall in nvidia-drm across all
+    // outputs (including eDP-1), leaving all screens black and wedging the MST hub
+    // across warm reboots until the USB-C cable is physically replugged.
     Variants {
         model: GlobalConfig.general.idle.timeouts
 
