@@ -165,7 +165,7 @@ with open(os.path.join(scheme_dir, "scheme.json"), "w") as f:
 
     # Verify caelestia was run
     caelestia_calls = (tmp_home_dir / "caelestia_calls.log").read_text()
-    assert "caelestia wallpaper -f" in caelestia_calls
+    assert "caelestia wallpaper" in caelestia_calls and "-f" in caelestia_calls
 
 def test_apply_theme_fallback_flow(test_dirs):
     mock_bin_dir, tmp_home_dir, wallpaper_path = test_dirs

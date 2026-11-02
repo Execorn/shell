@@ -21,14 +21,14 @@ StyledWindow {
 
     readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
     readonly property bool hasSpecialWorkspace: (monitor?.lastIpcObject?.specialWorkspace?.name?.length ?? 0) > 0
-    readonly property bool hasFullscreenOnNormalWs: monitor?.activeWorkspace?.toplevels?.values?.some(t => t?.lastIpcObject?.fullscreen > 1) ?? false
+    readonly property bool hasFullscreenOnNormalWs: (monitor?.activeWorkspace?.hasFullscreen || (monitor?.activeWorkspace?.toplevels?.values?.filter(t => t?.lastIpcObject?.fullscreen > 1).length ?? 0) > 0) ?? false
     readonly property bool hasFullscreen: {
         if (hasSpecialWorkspace) {
             const specialName = monitor?.lastIpcObject?.specialWorkspace?.name;
             if (!specialName)
                 return false;
             const specialWs = Hypr.workspaces.values.find(ws => ws.name === specialName);
-            return specialWs?.toplevels?.values?.some(t => t?.lastIpcObject?.fullscreen > 1) ?? false;
+            return (specialWs?.hasFullscreen || (specialWs?.toplevels?.values?.filter(t => t?.lastIpcObject?.fullscreen > 1).length ?? 0) > 0) ?? false;
         }
         return hasFullscreenOnNormalWs;
     }
@@ -76,9 +76,10 @@ StyledWindow {
 
     name: "drawers"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer: (fsTransitionProg > 0 && (contentItem.Config.general.showOverFullscreen || panels.osd.offsetScale < 1 || anyDrawerActive))
-                      || (hasSpecialWorkspace && hasFullscreenOnNormalWs)
-                      ? WlrLayer.Overlay : WlrLayer.Top
+    // Keep the window on WlrLayer.Overlay when showOverFullscreen is enabled so Hyprland does not
+    // occlude the surface behind fullscreen windows on WlrLayer.Top and suppress wl_surface.frame
+    // callbacks, which would stall Qt's polish and animation loop when OSD or drawers open.
+    WlrLayershell.layer: contentItem.Config.general.showOverFullscreen || (fsTransitionProg > 0 && (panels.osd.offsetScale < 1 || visibilities.osd || anyDrawerActive)) || (hasSpecialWorkspace && hasFullscreenOnNormalWs) ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: visibilities.launcher || visibilities.session || visibilities.dashboard || visibilities.cheatsheet || notificationHovered ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: (hasFullscreen && !anyDrawerActive) ? emptyRegion : regions

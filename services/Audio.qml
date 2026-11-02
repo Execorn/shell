@@ -35,6 +35,8 @@ Singleton {
     readonly property alias cava: cava
     readonly property alias beatTracker: beatTracker
 
+    signal osdTriggered
+
     function isNodeValid(node: var): bool {
         return !!node && !!Pipewire && !!Pipewire.nodes && Pipewire.nodes.values.indexOf(node) !== -1 && node.ready;
     }
@@ -57,6 +59,8 @@ Singleton {
             sink.audio.muted = false;
             sink.audio.volume = Math.max(0, Math.min(GlobalConfig.services.maxVolume, newVolume));
         }
+
+        root.osdTriggered();
     }
 
     function incrementVolume(amount: var): void {
@@ -716,6 +720,7 @@ except Exception:
             if (!isNaN(vol)) {
                 root.customVolume = vol;
                 root.customMuted = mut ? 1 : 0;
+                root.osdTriggered();
             }
         }
 

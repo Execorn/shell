@@ -225,7 +225,12 @@ Singleton {
             } else if (n.includes("workspace")) {
                 Hyprland.refreshWorkspaces();
                 autotileTimer.restart();
-            } else if (n.includes("window") || n.includes("group") || ["pin", "fullscreen", "changefloatingmode", "minimize"].includes(n)) {
+            } else if (n === "fullscreen") {
+                Hyprland.refreshToplevels();
+                Hyprland.refreshWorkspaces();
+                Hyprland.refreshMonitors();
+                autotileTimer.restart();
+            } else if (n.includes("window") || n.includes("group") || ["pin", "changefloatingmode", "minimize"].includes(n)) {
                 Hyprland.refreshToplevels();
                 autotileTimer.restart();
             }

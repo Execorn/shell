@@ -20,31 +20,33 @@ Singleton {
     readonly property list<Monitor> monitors: variants.instances // qmllint disable incompatible-type
     property bool appleDisplayPresent: false
 
+    signal brightnessUpdated(real value)
+
     function getMonitorForScreen(screen: ShellScreen): var {
-        return monitors.find(m => m.modelData === screen); // qmllint disable missing-property
+        return monitors.find(m => m.modelData === screen) ?? null; // qmllint disable missing-property
     }
 
     function getMonitor(query: string): var {
         if (query === "active") {
-            return monitors.find(m => Hypr.monitorFor(m.modelData)?.focused); // qmllint disable missing-property
+            return monitors.find(m => Hypr.monitorFor(m.modelData)?.focused) ?? null; // qmllint disable missing-property
         }
 
         if (query.startsWith("model:")) {
             const model = query.slice(6);
-            return monitors.find(m => m.modelData.model === model); // qmllint disable missing-property
+            return monitors.find(m => m.modelData?.model === model) ?? null; // qmllint disable missing-property
         }
 
         if (query.startsWith("serial:")) {
             const serial = query.slice(7);
-            return monitors.find(m => m.modelData.serialNumber === serial); // qmllint disable missing-property
+            return monitors.find(m => m.modelData?.serialNumber === serial) ?? null; // qmllint disable missing-property
         }
 
         if (query.startsWith("id:")) {
             const id = parseInt(query.slice(3), 10);
-            return monitors.find(m => Hypr.monitorFor(m.modelData)?.id === id); // qmllint disable missing-property
+            return monitors.find(m => Hypr.monitorFor(m.modelData)?.id === id) ?? null; // qmllint disable missing-property
         }
 
-        return monitors.find(m => m.modelData.name === query); // qmllint disable missing-property
+        return monitors.find(m => m.modelData?.name === query) ?? null; // qmllint disable missing-property
     }
 
     function increaseBrightness(): void {
@@ -165,10 +167,10 @@ Singleton {
         id: monitor
 
         required property ShellScreen modelData
-        readonly property var ddcInfo: root.ddcMonitorMap[modelData.name] ?? null
+        readonly property var ddcInfo: root.ddcMonitorMap[modelData?.name ?? ""] ?? null
         readonly property bool isDdc: ddcInfo !== null
         readonly property string busNum: ddcInfo?.busNum ?? ""
-        readonly property bool isAppleDisplay: root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
+        readonly property bool isAppleDisplay: root.appleDisplayPresent && (modelData?.model?.startsWith("StudioDisplay") ?? false)
         property real brightness
         property real queuedBrightness: NaN
 
@@ -199,15 +201,25 @@ Singleton {
         function setBrightness(value: real): void {
             value = Math.max(0, Math.min(1, value));
             const rounded = Math.round(value * 100);
-            if (Math.round(brightness * 100) === rounded)
+            if (Math.round(brightness * 100) === rounded) {
+                root.brightnessUpdated(brightness);
                 return;
+            }
 
             if (isDdc && timer.running) {
                 queuedBrightness = value;
+                root.brightnessUpdated(value);
                 return;
             }
 
             brightness = value;
+            if (!isAppleDisplay && !isDdc) {
+                for (const m of root.monitors) {
+                    if (!m.isAppleDisplay && !m.isDdc && m !== monitor)
+                        m.brightness = value;
+                }
+            }
+            root.brightnessUpdated(value);
 
             if (isAppleDisplay)
                 Quickshell.execDetached(["asdbctl", "set", rounded]);

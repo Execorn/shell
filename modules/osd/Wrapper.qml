@@ -49,6 +49,12 @@ Item {
     }
 
     Connections {
+        function onOsdTriggered(): void {
+            root.show();
+            root.volume = Audio.volume;
+            root.muted = Audio.muted;
+        }
+
         function onMutedChanged(): void {
             root.show();
             root.muted = Audio.muted;
@@ -79,6 +85,15 @@ Item {
         }
 
         target: root.monitor
+    }
+
+    Connections {
+        function onBrightnessUpdated(value: real): void {
+            root.show();
+            root.brightness = root.monitor?.brightness ?? value;
+        }
+
+        target: Brightness
     }
 
     Timer {
@@ -113,6 +128,13 @@ Item {
             } else {
                 source = "";
             }
+        }
+
+        Binding {
+            when: content.item !== null
+            target: content.item
+            property: "monitor"
+            value: root.monitor
         }
 
         Binding {
