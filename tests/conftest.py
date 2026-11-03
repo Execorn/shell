@@ -8,6 +8,8 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlEngine, qmlRegisterType, qmlRegisterSingletonInstance, QmlAttached
 from PySide6.QtQuick import QQuickItem
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 # Set Qt offscreen platform before application creation
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 os.environ["QML_DISABLE_DISK_CACHE"] = "1"
@@ -163,6 +165,15 @@ mocks = {
         'ExclusionMode.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    enum Type {\n        Ignore = 0\n    }\n}\n',
         'WlrLayer.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    enum Type {\n        Overlay = 0\n    }\n}\n',
         'WlrKeyboardFocus.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    enum Type {\n        Exclusive = 0\n    }\n}\n',
+    },
+    'Quickshell/Hyprland': {
+        'qmldir': 'module Quickshell.Hyprland\n',
+    },
+    'Caelestia/Internal': {
+        'qmldir': 'module Caelestia.Internal\n',
+    },
+    'Caelestia/Models': {
+        'qmldir': 'module Caelestia.Models\n',
     }
 }
 
@@ -173,8 +184,8 @@ for mod, files in mocks.items():
         (d / fname).write_text(content)
 
 # Copy the real Audio.qml and ScreenTemp.qml to qs/services/
-shutil.copy("/home/execorn/ricing/shell/services/Audio.qml", base_import_path / "qs/services/Audio.qml")
-shutil.copy("/home/execorn/ricing/shell/services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
+shutil.copy(REPO_ROOT / "services/Audio.qml", base_import_path / "qs/services/Audio.qml")
+shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
 
 # Mock Pipewire and QML Classes
 class MockPwAudio(QObject):
@@ -1210,14 +1221,14 @@ def qapp():
         (services_dir / f).unlink(missing_ok=True)
 
     # Copy Audio.qml and ScreenTemp.qml to isolated services path
-    shutil.copy("/home/execorn/ricing/shell/services/Audio.qml", base_import_path / "qs/services/Audio.qml")
-    shutil.copy("/home/execorn/ricing/shell/services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
-    shutil.copy("/home/execorn/ricing/shell/services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
+    shutil.copy(REPO_ROOT / "services/Audio.qml", base_import_path / "qs/services/Audio.qml")
+    shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
+    shutil.copy(REPO_ROOT / "services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
 
     # Copy ScreenTemp to global qml-imports (for compatibility)
     global_services = pathlib.Path("/tmp/qml-imports/qs/services")
     global_services.mkdir(parents=True, exist_ok=True)
-    shutil.copy("/home/execorn/ricing/shell/services/ScreenTemp.qml", str(global_services / "ScreenTemp.qml"))
+    shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", str(global_services / "ScreenTemp.qml"))
 
     # Instantiate the application instance once per test session
     app = QGuiApplication.instance()

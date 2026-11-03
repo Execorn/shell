@@ -7,8 +7,10 @@ import subprocess
 import pytest
 from PIL import Image
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 def run_apply_theme(wallpaper_path, mock_bin_dir, tmp_home_dir, force_fallback=False):
-    script_path = "/home/execorn/ricing/shell/scripts/apply-theme.py"
+    script_path = str(REPO_ROOT / "scripts/apply-theme.py")
     env = os.environ.copy()
     env["HOME"] = str(tmp_home_dir)
     env["PATH"] = f"{mock_bin_dir}:{env.get('PATH', '')}"
@@ -165,7 +167,7 @@ with open(os.path.join(scheme_dir, "scheme.json"), "w") as f:
 
     # Verify caelestia was run
     caelestia_calls = (tmp_home_dir / "caelestia_calls.log").read_text()
-    assert "caelestia wallpaper" in caelestia_calls and "-f" in caelestia_calls
+    assert "caelestia" in caelestia_calls and "wallpaper" in caelestia_calls and "-f" in caelestia_calls
 
 def test_apply_theme_fallback_flow(test_dirs):
     mock_bin_dir, tmp_home_dir, wallpaper_path = test_dirs

@@ -273,6 +273,58 @@ void ImageCacher::saveToCache(const QString& cachePath, const QImage& image) {
     }
 
     qCDebug(lcCacher).noquote() << "Saved to" << cachePath;
+    pruneCacheIfNeeded();
+}
+
+void ImageCacher::pruneCacheIfNeeded() {
+    static QMutex pruneMutex;
+    if (!pruneMutex.tryLock()) {
+        return;
+    }
+    struct Locker {
+        QMutex* m;
+        ~Locker() {
+            if (m)
+                m->unlock();
+        }
+    } locker { &pruneMutex };
+
+    constexpr qint64 MAX_CACHE_BYTES = 64 * 1024 * 1024;     // 64 MiB
+    constexpr qint64 TARGET_CACHE_BYTES = 48 * 1024 * 1024;  // 48 MiB
+    constexpr qsizetype MAX_CACHE_ENTRIES = 1024;
+    constexpr qsizetype TARGET_CACHE_ENTRIES = 768;
+
+    const QString dirPath = cacheDir();
+    const QDir dir(dirPath);
+    if (!dir.exists()) {
+        return;
+    }
+
+    const QFileInfoList entries = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot, QDir::Time | QDir::Reversed);
+    qint64 totalBytes = 0;
+    for (const QFileInfo& fi : entries) {
+        totalBytes += fi.size();
+    }
+
+    if (totalBytes <= MAX_CACHE_BYTES && entries.size() <= MAX_CACHE_ENTRIES) {
+        return;
+    }
+
+    qCDebug(lcCacher) << "Pruning image cache: size =" << totalBytes << "bytes, count =" << entries.size();
+
+    qsizetype remainingCount = entries.size();
+    for (const QFileInfo& fi : entries) {
+        if (totalBytes <= TARGET_CACHE_BYTES && remainingCount <= TARGET_CACHE_ENTRIES) {
+            break;
+        }
+        const qint64 sz = fi.size();
+        if (QFile::remove(fi.absoluteFilePath())) {
+            totalBytes -= sz;
+            --remainingCount;
+        }
+    }
+
+    qCDebug(lcCacher) << "Image cache pruned: remaining size =" << totalBytes << "bytes, count =" << remainingCount;
 }
 
 } // namespace caelestia::images

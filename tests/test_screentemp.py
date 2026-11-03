@@ -5,6 +5,8 @@ import PySide6.QtCore as QtCore
 from PySide6.QtQml import QQmlComponent
 from PySide6.QtCore import QObject
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 def test_screentemp_service(qml_engine):
     from PySide6.QtQml import QJSValue
     screentemp_val = qml_engine.singletonInstance("qs.services", "ScreenTemp")
@@ -70,7 +72,7 @@ def test_screentemp_service(qml_engine):
 
 def test_control_center_compiles_and_loads(qml_engine):
     # Try loading ControlCenter.qml
-    comp = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/ControlCenter.qml")
+    comp = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/ControlCenter.qml"))
     control_center = comp.create()
     if not control_center:
         pytest.fail(f"Failed to load ControlCenter.qml: {comp.errors()}")
@@ -78,7 +80,7 @@ def test_control_center_compiles_and_loads(qml_engine):
 
 def test_content_tabbed_compiles_and_loads(qml_engine):
     # Try loading Content.qml
-    comp = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/Content.qml")
+    comp = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/Content.qml"))
     
     props = QObject()
     visibilities = QObject()
@@ -95,7 +97,7 @@ def test_content_tabbed_compiles_and_loads(qml_engine):
 
 def test_screentools_panel_compiles_and_loads(qml_engine):
     # Try loading ScreenTools.qml directly
-    comp = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/ScreenTools.qml")
+    comp = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/ScreenTools.qml"))
     
     props = QObject()
     visibilities = QObject()

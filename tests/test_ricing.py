@@ -9,6 +9,8 @@ from PySide6.QtQml import qmlRegisterType, qmlRegisterSingletonInstance, qmlRegi
 from PySide6.QtQuick import QQuickItem
 from conftest import MockPwNode
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
 # Mock FileView
 class MockFileView(QObject):
     loaded = Signal()
@@ -521,7 +523,7 @@ class MockQuickshell(QObject):
     def __init__(self):
         super().__init__()
         self.envs = {
-            "HOME": "/home/execorn",
+            "HOME": os.environ.get("HOME", "/home/execorn"),
             "XDG_STATE_HOME": "/tmp/caelestia-test-state",
             "XDG_CACHE_HOME": "/tmp/caelestia-test-cache",
             "XDG_CONFIG_HOME": "/tmp/caelestia-test-config",
@@ -551,7 +553,7 @@ class MockQuickshell(QObject):
             pathlib.Path("/tmp/bluetoothctl_calls.log").open("a").write(f"{cmd_str}\n")
         elif bin_name == "pkill":
             pathlib.Path("/tmp/pkill_calls.log").open("a").write(f"{cmd_str}\n")
-        elif bin_name == "apply-theme.py" or (bin_name == "python3" and len(cmd_args) > 1 and pathlib.Path(cmd_args[1]).name == "apply-theme.py"):
+        elif any("apply-theme.py" in arg for arg in cmd_args):
             if "--wallpaper" in cmd_args:
                 idx = cmd_args.index("--wallpaper")
                 wall_path = cmd_args[idx + 1]
@@ -559,9 +561,13 @@ class MockQuickshell(QObject):
                     pathlib.Path("/tmp/caelestia_calls.log").open("a").write("wallpaper -r\n")
                 else:
                     pathlib.Path("/tmp/caelestia_calls.log").open("a").write(f"wallpaper -f {wall_path}\n")
-        elif bin_name == "wwal-helper.py" or (bin_name == "python3" and len(cmd_args) > 1 and pathlib.Path(cmd_args[1]).name == "wwal-helper.py"):
+        elif any("wwal-helper.py" in arg for arg in cmd_args):
             if "random" in cmd_args:
                 pathlib.Path("/tmp/caelestia_calls.log").open("a").write("wallpaper -r\n")
+            elif "set" in cmd_args:
+                idx = cmd_args.index("set")
+                if idx + 1 < len(cmd_args):
+                    pathlib.Path("/tmp/caelestia_calls.log").open("a").write(f"wallpaper -f {cmd_args[idx + 1]}\n")
 
     @Slot(str, result=str)
     def shellPath(self, path):
@@ -593,7 +599,7 @@ def setup_qml_services():
         for name, content in files.items():
             (d / name).write_text(content)
 
-    src_dir = pathlib.Path("/home/execorn/ricing/shell/services")
+    src_dir = REPO_ROOT / "services"
     dest_dir = pathlib.Path("/tmp/qml-imports/qs/services")
     if not dest_dir.exists():
         dest_dir.mkdir(parents=True, exist_ok=True)
@@ -649,7 +655,7 @@ Dummy 1.0 Dummy.qml
 """
     (dest_dir / "qmldir").write_text(qmldir_content)
 
-    src_utils = pathlib.Path("/home/execorn/ricing/shell/utils")
+    src_utils = REPO_ROOT / "utils"
     dest_utils = pathlib.Path("/tmp/qml-imports/qs/utils")
     if not dest_utils.exists():
         dest_utils.mkdir(parents=True, exist_ok=True)
@@ -989,7 +995,7 @@ def ricing_suite(qml_engine, mock_bins):
     
     wall_dir = state_dir / "wallpaper"
     wall_dir.mkdir(parents=True, exist_ok=True)
-    (wall_dir / "path.txt").write_text("/home/execorn/ricing/shell/assets/wallpaper.webp")
+    (wall_dir / "path.txt").write_text(str(REPO_ROOT / "assets/wallpaper.webp"))
         
     yield {
         "engine": qml_engine,

@@ -237,7 +237,11 @@ except Exception:
     }
 
     function setAudioSource(newSource: var): void {
-        if (!newSource || !newSource.name) return;
+        if (!newSource) {
+            if (Pipewire) Pipewire.preferredDefaultAudioSource = null;
+            return;
+        }
+        if (!newSource.name) return;
         manualSourceOverride = true;
         preferredPhysicalSource = newSource.name;
         if (Pipewire) {

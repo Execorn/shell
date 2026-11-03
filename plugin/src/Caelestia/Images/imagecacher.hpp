@@ -28,6 +28,7 @@ public:
     void schedule(const QString& sourcePath, const QSize& size, FillMode fillMode);
     void schedule(const QString& sourcePath, const QString& cachePath, const QSize& size, FillMode fillMode);
     void scheduleSave(const QString& cachePath, const QImage& image);
+    static void pruneCacheIfNeeded();
 
 private:
     explicit ImageCacher(QObject* parent = nullptr);

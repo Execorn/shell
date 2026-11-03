@@ -5,8 +5,12 @@ import subprocess
 import tempfile
 import pathlib
 import pytest
-
-PARSER_PATH = "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+_candidate_parser = REPO_ROOT.parent / "hyprland_cheat_sheet/parser/parse_keybinds.py"
+PARSER_PATH = os.environ.get(
+    "HYPRLAND_PARSER_PATH",
+    str(_candidate_parser if _candidate_parser.exists() else "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py")
+)
 
 def run_parser(variables_paths, keybinds_path, output_path):
     cmd = ["python3", PARSER_PATH]

@@ -3,7 +3,8 @@ import pathlib
 from PySide6.QtQml import QQmlComponent
 from PySide6.QtCore import QObject, Property, Signal
 
-OVERVIEW_QML_PATH = "/home/execorn/ricing/shell/modules/overview/Overview.qml"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+OVERVIEW_QML_PATH = str(REPO_ROOT / "modules/overview/Overview.qml")
 
 class MockWindow(QObject):
     def __init__(self, address, title, ws_id, x=100, y=100, width=800, height=600):

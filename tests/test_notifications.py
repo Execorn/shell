@@ -1,7 +1,10 @@
+import pathlib
 import pytest
 import PySide6.QtCore as QtCore
 from PySide6.QtQml import QQmlComponent
 from PySide6.QtCore import QObject
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 def test_notifs_muting_service(qml_engine):
     from PySide6.QtQml import QJSValue
@@ -28,7 +31,7 @@ def test_notifs_muting_service(qml_engine):
 
 def test_notif_data_is_critical(qml_engine):
     # Load NotifData component
-    comp = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/services/NotifData.qml")
+    comp = QQmlComponent(qml_engine, str(REPO_ROOT / "services/NotifData.qml"))
     notif_data = comp.create()
     if not notif_data:
         pytest.fail(f"Failed to load NotifData.qml: {comp.errors()}")
@@ -66,7 +69,7 @@ def test_notif_data_is_critical(qml_engine):
 
 def test_notification_ui_components_compile(qml_engine):
     # Test compilation of NotifDock.qml
-    comp1 = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/NotifDock.qml")
+    comp1 = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/NotifDock.qml"))
     props = QObject()
     visibilities = QObject()
     ctx = qml_engine.rootContext()
@@ -81,9 +84,9 @@ def test_notification_ui_components_compile(qml_engine):
     assert dock is not None
 
     # Test compilation of Notif.qml
-    comp2 = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/Notif.qml")
+    comp2 = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/Notif.qml"))
     # Stub model data
-    notif_data = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/services/NotifData.qml").create()
+    notif_data = QQmlComponent(qml_engine, str(REPO_ROOT / "services/NotifData.qml")).create()
     
     notif_card = comp2.beginCreate(ctx)
     if notif_card:
@@ -97,7 +100,7 @@ def test_notification_ui_components_compile(qml_engine):
     assert notif_card is not None
 
     # Test compilation of NotifActionList.qml
-    comp3 = QQmlComponent(qml_engine, "/home/execorn/ricing/shell/modules/sidebar/NotifActionList.qml")
+    comp3 = QQmlComponent(qml_engine, str(REPO_ROOT / "modules/sidebar/NotifActionList.qml"))
     action_list = comp3.beginCreate(ctx)
     if action_list:
         action_list.setProperty("notif", notif_data)

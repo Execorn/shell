@@ -7,8 +7,9 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuick import QQuickItem
 from conftest import MockPwNode, MockPwAudio, MockPopoutState, MockToaster
 
-AUDIO_QML_PATH = "/home/execorn/ricing/shell/services/Audio.qml"
-UI_QML_PATH = "/home/execorn/ricing/shell/modules/bar/popouts/Audio.qml"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+AUDIO_QML_PATH = str(REPO_ROOT / "services/Audio.qml")
+UI_QML_PATH = str(REPO_ROOT / "modules/bar/popouts/Audio.qml")
 
 def find_ipc_handler(audio):
     for child in audio.findChildren(QObject):

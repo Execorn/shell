@@ -10,7 +10,12 @@ from conftest import MockPwNode, MockPwAudio
 from test_audio import audio_suite, find_ipc_handler, find_mouse_area
 
 # Path to parse_keybinds script for parser integration tests
-PARSER_SCRIPT_PATH = "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py"
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+_candidate_parser = REPO_ROOT.parent / "hyprland_cheat_sheet/parser/parse_keybinds.py"
+PARSER_SCRIPT_PATH = os.environ.get(
+    "HYPRLAND_PARSER_PATH",
+    str(_candidate_parser if _candidate_parser.exists() else "/home/execorn/programming/projects/hyprland_cheat_sheet/parser/parse_keybinds.py")
+)
 
 def run_integration_parser(var_content, key_content, tmp_path):
     var_file = tmp_path / "variables.conf"
