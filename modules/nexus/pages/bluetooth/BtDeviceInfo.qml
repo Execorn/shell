@@ -15,7 +15,7 @@ PageBase {
 
     readonly property BluetoothDevice device: nState.selectedBtDevice
     readonly property bool connected: device?.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
-    readonly property bool loading: device?.state === BluetoothDeviceState.Connecting || device?.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+    readonly property bool loading: device?.state === BluetoothDeviceState.Connecting || device?.state === BluetoothDeviceState.Disconnecting || (Bluez.enabling && Bluez.pendingConnectDevice === device) // qmllint disable unresolved-type
 
     readonly property string statusText: {
         if (!device)
@@ -102,10 +102,8 @@ PageBase {
                 implicitHeight: connectBtnContent.implicitHeight + Tokens.padding.medium * 2
 
                 onClicked: {
-                    if (!root.connected && root.device && !root.device.trusted)
-                        root.device.trusted = true;
                     if (root.device)
-                        root.device.connected = !root.connected;
+                        Bluez.toggleDeviceConnection(root.device);
                 }
 
                 AnimLoader {

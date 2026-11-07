@@ -44,7 +44,9 @@ Singleton {
     readonly property alias options: extras.options
     readonly property alias devices: extras.devices
 
-    property bool hadKeyboard
+    property bool hadKeyboard: false
+    property bool lastCapsLock: false
+    property bool lastNumLock: false
     property string lastKbLayoutFull: ""
     property string lastSpecialWorkspace: ""
 
@@ -165,7 +167,28 @@ Singleton {
     onUsingLuaChanged: reloadDynamicConfs()
     Component.onCompleted: reloadDynamicConfs()
 
+    onKeyboardChanged: {
+        if (!keyboard) {
+            hadKeyboard = false;
+            return;
+        }
+        if (!hadKeyboard) {
+            lastCapsLock = capsLock;
+            lastNumLock = numLock;
+            if (kbLayoutFull && kbLayoutFull !== "Unknown")
+                lastKbLayoutFull = kbLayoutFull;
+            Qt.callLater(() => {
+                root.hadKeyboard = !!root.keyboard;
+            });
+        }
+    }
+
     onCapsLockChanged: {
+        if (!hadKeyboard || capsLock === lastCapsLock) {
+            lastCapsLock = capsLock;
+            return;
+        }
+        lastCapsLock = capsLock;
         if (!GlobalConfig.utilities.toasts.capsLockChanged)
             return;
 
@@ -176,6 +199,11 @@ Singleton {
     }
 
     onNumLockChanged: {
+        if (!hadKeyboard || numLock === lastNumLock) {
+            lastNumLock = numLock;
+            return;
+        }
+        lastNumLock = numLock;
         if (!GlobalConfig.utilities.toasts.numLockChanged)
             return;
 
@@ -198,8 +226,6 @@ Singleton {
 
         if (kbLayoutFull && kbLayoutFull !== "Unknown")
             lastKbLayoutFull = kbLayoutFull;
-
-        hadKeyboard = !!keyboard;
     }
 
     Connections {

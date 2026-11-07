@@ -5,6 +5,40 @@
 
 namespace caelestia {
 
+namespace {
+
+QString toastCategory(const QString& title) {
+    if (title == QLatin1String("Caps lock enabled") || title == QLatin1String("Caps lock disabled")) {
+        return QStringLiteral("capslock");
+    }
+    if (title == QLatin1String("Num lock enabled") || title == QLatin1String("Num lock disabled")) {
+        return QStringLiteral("numlock");
+    }
+    if (title == QLatin1String("Do not disturb enabled") || title == QLatin1String("Do not disturb disabled")) {
+        return QStringLiteral("dnd");
+    }
+    if (title == QLatin1String("Game mode enabled") || title == QLatin1String("Game mode disabled")) {
+        return QStringLiteral("gamemode");
+    }
+    if (title == QLatin1String("Charger plugged in") || title == QLatin1String("Charger unplugged")) {
+        return QStringLiteral("charger");
+    }
+    if (title.startsWith(QLatin1String("VPN "))) {
+        return QStringLiteral("vpn");
+    }
+    if (title == QLatin1String("Audio output changed") || title == QLatin1String("Audio input changed") ||
+        title == QLatin1String("Keyboard layout changed") || title == QLatin1String("Keyboard layout limit") ||
+        title == QLatin1String("Now Playing") || title == QLatin1String("Config loaded") ||
+        title == QLatin1String("Wallpaper on Boot") || title == QLatin1String("Wallpaper Slideshow") ||
+        title == QLatin1String("Slideshow Interval") || title == QLatin1String("Monitors") ||
+        title == QLatin1String("Equalizer")) {
+        return title;
+    }
+    return QString();
+}
+
+} // namespace
+
 Toast::Toast(const QString& title, const QString& message, const QString& icon, Type type, int timeout, QObject* parent)
     : QObject(parent)
     , m_closed(false)
@@ -101,6 +135,19 @@ QQmlListProperty<Toast> Toaster::toasts() {
 }
 
 void Toaster::toast(const QString& title, const QString& message, const QString& icon, Toast::Type type, int timeout) {
+    const QString category = toastCategory(title);
+    const auto currentToasts = m_toasts;
+    for (auto* existing : currentToasts) {
+        if (!existing || existing->closed()) {
+            continue;
+        }
+        const bool exactMatch = existing->title() == title && existing->message() == message;
+        const bool categoryMatch = !category.isEmpty() && toastCategory(existing->title()) == category;
+        if (exactMatch || categoryMatch) {
+            existing->close();
+        }
+    }
+
     auto* toast = new Toast(title, message, icon, type, timeout, this);
     QObject::connect(toast, &Toast::finishedClose, this, [toast, this]() {
         if (m_toasts.removeOne(toast)) {

@@ -188,12 +188,8 @@ Item {
 
                 SwitchRow {
                     label: qsTr("Bluetooth")
-                    checked: Bluetooth.defaultAdapter?.enabled ?? false
-                    onToggled: checked => {
-                        const adapter = Bluetooth.defaultAdapter;
-                        if (adapter)
-                            adapter.enabled = checked;
-                    }
+                    checked: Bluez.enabled
+                    onToggled: checked => Bluez.setEnabled(checked)
                 }
 
                 // Dropdown Button
@@ -220,7 +216,7 @@ Item {
 
                         MaterialIcon {
                             text: "bluetooth"
-                            color: (Bluetooth.defaultAdapter?.enabled ?? false) ? Colours.palette.m3primary : Colours.palette.m3outline
+                            color: Bluez.enabled ? Colours.palette.m3primary : Colours.palette.m3outline
                         }
 
                         StyledText {
@@ -256,7 +252,7 @@ Item {
                             color: modelData.connected ? Colours.palette.m3primaryContainer : Colours.layer(Colours.palette.m3surfaceContainer, 1)
 
                             StateLayer {
-                                onClicked: modelData.connected = !modelData.connected
+                                onClicked: Bluez.toggleDeviceConnection(modelData)
                             }
 
                             RowLayout {

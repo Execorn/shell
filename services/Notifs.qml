@@ -38,7 +38,7 @@ Singleton {
     }
 
     onDndChanged: {
-        if (!GlobalConfig.utilities.toasts.dndChanged)
+        if (!root.loaded || !GlobalConfig.utilities.toasts.dndChanged)
             return;
 
         if (dnd)
@@ -145,6 +145,23 @@ Singleton {
         persistenceSupported: true
 
         onNotification: notif => {
+            const now = Date.now();
+            const duplicate = root.notClosed.find(existing =>
+                existing.appName === notif.appName &&
+                existing.summary === notif.summary &&
+                existing.body === notif.body &&
+                (existing.popup || (now - existing.time.getTime() < 2000))
+            );
+            if (duplicate) {
+                duplicate.time = new Date();
+                duplicate.updateTimeStr();
+                if (root.shouldShowPopup() && !root.isAppMuted(notif.appName)) {
+                    duplicate.popup = true;
+                    duplicate.timer.restart();
+                }
+                return;
+            }
+
             notif.tracked = true;
 
             const comp = notifComp.createObject(root, {

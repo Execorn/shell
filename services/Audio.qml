@@ -13,6 +13,29 @@ Singleton {
 
     property string previousSinkName: ""
     property string previousSourceName: ""
+    property bool syncingNodes: false
+    property bool startupEnumerating: false
+    property var startupPendingNodeIds: []
+    property var readyOnceNodeIds: ({})
+    property string lastToastedSinkName: ""
+    property double lastToastedSinkTime: 0
+    property double lastPrioritySinkConnectTime: 0
+    property string lastToastedSourceName: ""
+    property double lastToastedSourceTime: 0
+    property double lastPrioritySourceConnectTime: 0
+
+    readonly property Timer startupEnumTimer: Timer {
+        interval: 800
+        repeat: false
+        onTriggered: {
+            root.startupPendingNodeIds = [];
+            root.startupEnumerating = false;
+            root.previousSinkName = root.activePhysicalSinkDesc || root.previousSinkName || qsTr("Unknown Device");
+            root.previousSourceName = root.activePhysicalSourceDesc || root.previousSourceName || qsTr("Unknown Device");
+            root.previousPhysicalSinkDesc = root.previousSinkName;
+            root.previousPhysicalSourceDesc = root.previousSourceName;
+        }
+    }
 
     property var sinks: []
     property var sources: []
@@ -38,7 +61,7 @@ Singleton {
     signal osdTriggered
 
     function isNodeValid(node: var): bool {
-        return !!node && !!Pipewire && !!Pipewire.nodes && Pipewire.nodes.values.indexOf(node) !== -1 && node.ready;
+        return !!node && !!Pipewire && !!Pipewire.nodes && Pipewire.nodes.values.indexOf(node) !== -1 && (node.ready || !!(node.id !== undefined && root.readyOnceNodeIds[node.id]));
     }
 
     function setVolume(newVolume: real): void {
@@ -97,18 +120,16 @@ Singleton {
         if (isNodeValid(dSink) && dSink.name === "riced_equalizer_sink") {
             const node = physicalSinks.find(s => isNodeValid(s) && s.name === preferredPhysicalSink);
             if (node) return node.description || node.name || "";
-        } else if (isNodeValid(sink)) {
+        } else if (isNodeValid(sink) && sink.name !== "riced_equalizer_sink" && sink.name !== "easyeffects_sink" && (!sink.properties || sink.properties["node.virtual"] !== "true")) {
             return sink.description || sink.name || "";
         }
         return "";
     }
 
     onActivePhysicalSinkDescChanged: {
-        if (!activePhysicalSinkDesc) return;
-        if (previousPhysicalSinkDesc && previousPhysicalSinkDesc !== activePhysicalSinkDesc && GlobalConfig.utilities.toasts.audioOutputChanged) {
-            Toaster.toast(qsTr("Audio output changed"), qsTr("Now using: %1").arg(activePhysicalSinkDesc), "volume_up");
-        }
-        previousPhysicalSinkDesc = activePhysicalSinkDesc;
+        if (root.syncingNodes || !activePhysicalSinkDesc)
+            return;
+        notifyOutputChanged(activePhysicalSinkDesc);
     }
 
     readonly property Process eqRouteProc: Process {}
@@ -130,14 +151,21 @@ Singleton {
             `import subprocess, sys
 target = sys.argv[1]
 try:
+    sinks = {}
+    for line in subprocess.check_output(["pactl", "list", "sinks", "short"]).decode("utf-8", errors="replace").splitlines():
+        parts = line.split("\\t")
+        if len(parts) >= 2:
+            sinks[parts[0].strip()] = parts[1].strip()
     out = subprocess.check_output(["pactl", "list", "sink-inputs"]).decode("utf-8", errors="replace")
     for block in out.split("Sink Input #"):
         if not block.strip(): continue
         lines = block.splitlines()
         sid = lines[0].strip()
         if "output.filter-chain" in block or "Riced Equalizer Sink" in block:
-            subprocess.run(["pactl", "move-sink-input", sid, target], check=True)
-except Exception as e:
+            cur_sink = next((l.split("Sink:")[1].strip() for l in lines if l.strip().startswith("Sink:")), "")
+            if sinks.get(cur_sink) != target and cur_sink != target:
+                subprocess.run(["pactl", "move-sink-input", sid, target], check=True)
+except Exception:
     pass
 `,
             sinkName
@@ -171,16 +199,15 @@ except Exception as e:
     readonly property string activePhysicalSourceDesc: {
         const node = physicalSources.find(s => isNodeValid(s) && s.name === preferredPhysicalSource);
         if (node) return node.description || node.name || "";
-        if (isNodeValid(source)) return source.description || source.name || "";
+        if (isNodeValid(source) && source.name !== "riced_microphone_source" && source.name !== "easyeffects_source" && (!source.properties || source.properties["node.virtual"] !== "true"))
+            return source.description || source.name || "";
         return "";
     }
 
     onActivePhysicalSourceDescChanged: {
-        if (!activePhysicalSourceDesc) return;
-        if (previousPhysicalSourceDesc && previousPhysicalSourceDesc !== activePhysicalSourceDesc && GlobalConfig.utilities.toasts.audioInputChanged) {
-            Toaster.toast(qsTr("Audio input changed"), qsTr("Now using: %1").arg(activePhysicalSourceDesc), "mic");
-        }
-        previousPhysicalSourceDesc = activePhysicalSourceDesc;
+        if (root.syncingNodes || !activePhysicalSourceDesc)
+            return;
+        notifyInputChanged(activePhysicalSourceDesc);
     }
 
     readonly property Process micRouteProc: Process {}
@@ -216,18 +243,27 @@ except Exception:
             `import subprocess, sys
 target = sys.argv[1]
 try:
+    sources = {}
+    for line in subprocess.check_output(["pactl", "list", "sources", "short"]).decode("utf-8", errors="replace").splitlines():
+        parts = line.split("\\t")
+        if len(parts) >= 2:
+            sources[parts[0].strip()] = parts[1].strip()
     out = subprocess.check_output(["pactl", "list", "source-outputs"]).decode("utf-8", errors="replace")
     for block in out.split("Source Output #"):
         if not block.strip(): continue
         lines = block.splitlines()
         sid = lines[0].strip()
         if "input.filter-chain" in block or "Riced Microphone Source" in block:
-            subprocess.run(["pactl", "move-source-output", sid, target], check=True)
+            cur_src = next((l.split("Source:")[1].strip() for l in lines if l.strip().startswith("Source:")), "")
+            if sources.get(cur_src) != target and cur_src != target:
+                subprocess.run(["pactl", "move-source-output", sid, target], check=True)
 except Exception:
     pass
 
 try:
-    subprocess.run(["pactl", "set-default-source", target], check=True)
+    cur_def = subprocess.check_output(["pactl", "get-default-source"]).decode("utf-8", errors="replace").strip()
+    if cur_def != target:
+        subprocess.run(["pactl", "set-default-source", target], check=True)
 except Exception:
     pass
 `,
@@ -505,31 +541,93 @@ except Exception:
         return (stream.properties && stream.properties["application.name"]) || stream.description || stream.name || qsTr("Unknown Application");
     }
 
+    function notifyOutputChanged(newSinkName: string): void {
+        if (!newSinkName || newSinkName === qsTr("Unknown Device") || newSinkName === "riced_equalizer_sink" || newSinkName === "easyeffects_sink" || newSinkName === "Riced Equalizer Sink" || newSinkName === "EasyEffects Sink")
+            return;
+
+        const now = Date.now();
+        if (root.lastPrioritySinkConnectTime > 0 && (now - root.lastPrioritySinkConnectTime) < 1500 && newSinkName !== root.lastToastedSinkName && root.lastToastedSinkName !== "") {
+            const hasPriority = physicalSinks.some(s => isNodeValid(s) && s.name && (s.name.indexOf("bluez_") !== -1 || s.name.indexOf("usb") !== -1));
+            if (!hasPriority)
+                return;
+        }
+
+        if (!root.startupEnumerating && previousSinkName && previousSinkName !== qsTr("Unknown Device") && previousSinkName !== newSinkName && GlobalConfig.utilities.toasts.audioOutputChanged) {
+            if (newSinkName !== root.lastToastedSinkName || (now - root.lastToastedSinkTime) >= 1500) {
+                const title = qsTr("Audio output changed");
+                if (Toaster.toasts) {
+                    for (let i = 0; i < Toaster.toasts.length; i++) {
+                        const t = Toaster.toasts[i];
+                        if (t && t.title === title && !t.closed && typeof t.close === "function")
+                            t.close();
+                    }
+                }
+                Toaster.toast(title, qsTr("Now using: %1").arg(newSinkName), "volume_up");
+                root.lastToastedSinkName = newSinkName;
+                root.lastToastedSinkTime = now;
+            }
+        }
+
+        previousSinkName = newSinkName;
+        previousPhysicalSinkDesc = newSinkName;
+    }
+
+    function notifyInputChanged(newSourceName: string): void {
+        if (!newSourceName || newSourceName === qsTr("Unknown Device") || newSourceName === "riced_microphone_source" || newSourceName === "easyeffects_source" || newSourceName === "Riced Microphone Source" || newSourceName === "EasyEffects Source")
+            return;
+
+        const now = Date.now();
+        if (root.lastPrioritySourceConnectTime > 0 && (now - root.lastPrioritySourceConnectTime) < 1500 && newSourceName !== root.lastToastedSourceName && root.lastToastedSourceName !== "") {
+            const hasPriority = physicalSources.some(s => isNodeValid(s) && s.name && (s.name.indexOf("bluez_") !== -1 || s.name.indexOf("usb") !== -1));
+            if (!hasPriority)
+                return;
+        }
+
+        if (!root.startupEnumerating && previousSourceName && previousSourceName !== qsTr("Unknown Device") && previousSourceName !== newSourceName && GlobalConfig.utilities.toasts.audioInputChanged) {
+            if (newSourceName !== root.lastToastedSourceName || (now - root.lastToastedSourceTime) >= 1500) {
+                const title = qsTr("Audio input changed");
+                if (Toaster.toasts) {
+                    for (let i = 0; i < Toaster.toasts.length; i++) {
+                        const t = Toaster.toasts[i];
+                        if (t && t.title === title && !t.closed && typeof t.close === "function")
+                            t.close();
+                    }
+                }
+                Toaster.toast(title, qsTr("Now using: %1").arg(newSourceName), "mic");
+                root.lastToastedSourceName = newSourceName;
+                root.lastToastedSourceTime = now;
+            }
+        }
+
+        previousSourceName = newSourceName;
+        previousPhysicalSourceDesc = newSourceName;
+    }
+
     onSinkChanged: {
         root.customVolume = -1;
         root.customMuted = -1;
-        if (!isNodeValid(sink))
+        if (root.syncingNodes || !isNodeValid(sink))
+            return;
+
+        if (sink.name === "riced_equalizer_sink" || sink.name === "easyeffects_sink")
             return;
 
         const newSinkName = sink.description || sink.name || qsTr("Unknown Device");
-
-        const isEQ = sink.name === "riced_equalizer_sink";
-        if (!isEQ && previousSinkName && previousSinkName !== newSinkName && GlobalConfig.utilities.toasts.audioOutputChanged)
-            Toaster.toast(qsTr("Audio output changed"), qsTr("Now using: %1").arg(newSinkName), "volume_up");
-
-        previousSinkName = newSinkName;
+        notifyOutputChanged(newSinkName);
     }
 
     onSourceChanged: {
-        if (!isNodeValid(source))
+        if (root.syncingNodes || !isNodeValid(source))
+            return;
+
+        if (source.name === "riced_microphone_source" || source.name === "easyeffects_source")
+            return;
+
+        if (preferredPhysicalSource !== "" && physicalSources.some(s => isNodeValid(s) && s.name === preferredPhysicalSource))
             return;
 
         const newSourceName = source.description || source.name || qsTr("Unknown Device");
-
-        if (previousSourceName && previousSourceName !== newSourceName && GlobalConfig.utilities.toasts.audioInputChanged)
-            Toaster.toast(qsTr("Audio input changed"), qsTr("Now using: %1").arg(newSourceName), "mic");
-
-        previousSourceName = newSourceName;
+        notifyInputChanged(newSourceName);
     }
 
     function syncNodes(): void {
@@ -541,6 +639,7 @@ except Exception:
         const newPhysicalSinks = [];
         const newPhysicalSources = [];
         const trackerObjects = [];
+        const nextReadyOnce = {};
 
         for (const node of Pipewire.nodes.values) {
             if (!node) continue;
@@ -552,12 +651,18 @@ except Exception:
             try {
                 node.readyChanged.connect(root.syncNodes);
             } catch (e) {}
+
+            const isReady = node.ready || !!(node.id !== undefined && root.readyOnceNodeIds[node.id]);
+            if (isReady && node.id !== undefined) {
+                nextReadyOnce[node.id] = true;
+            }
+
             if (!node.isStream) {
                 const isVirtual = (node.properties && node.properties["node.virtual"] === "true") || node.name === "easyeffects_sink" || node.name === "easyeffects_source" || node.name === "riced_equalizer_sink" || node.name === "riced_microphone_source";
 
                 if (node.isSink) {
                     trackerObjects.push(node);
-                    if (node.ready) {
+                    if (isReady) {
                         newSinks.push(node);
                         if (!isVirtual) {
                             newPhysicalSinks.push(node);
@@ -565,7 +670,7 @@ except Exception:
                     }
                 } else if (node.audio) {
                     trackerObjects.push(node);
-                    if (node.ready) {
+                    if (isReady) {
                         newSources.push(node);
                         if (!isVirtual) {
                             newPhysicalSources.push(node);
@@ -574,12 +679,14 @@ except Exception:
                 }
             } else if (node.audio) {
                 trackerObjects.push(node);
-                if (node.ready) {
+                if (isReady) {
                     newStreams.push(node);
                 }
             }
         }
 
+        root.readyOnceNodeIds = nextReadyOnce;
+        root.syncingNodes = true;
         root.sinks = newSinks;
         root.sources = newSources;
         root.streams = newStreams;
@@ -587,7 +694,7 @@ except Exception:
         root.physicalSources = newPhysicalSources;
 
         const currentPhysicalNames = newPhysicalSinks.map(s => s.name);
-        if (root.knownPhysicalSinkNames.length > 0) {
+        if (!root.startupEnumerating && root.knownPhysicalSinkNames.length > 0) {
             for (let i = 0; i < currentPhysicalNames.length; i++) {
                 const name = currentPhysicalNames[i];
                 if (root.knownPhysicalSinkNames.indexOf(name) === -1) {
@@ -595,6 +702,7 @@ except Exception:
                     if (name.indexOf("bluez_output") !== -1 || name.indexOf("bluez_sink") !== -1 || name.indexOf("usb") !== -1) {
                         console.log("[Audio.qml] Auto-switching to newly connected priority device:", name);
                         root.manualSinkOverride = false;
+                        root.lastPrioritySinkConnectTime = Date.now();
                     }
                 }
             }
@@ -602,7 +710,7 @@ except Exception:
         root.knownPhysicalSinkNames = currentPhysicalNames;
 
         const currentPhysicalSourceNames = newPhysicalSources.map(s => s.name);
-        if (root.knownPhysicalSourceNames.length > 0) {
+        if (!root.startupEnumerating && root.knownPhysicalSourceNames.length > 0) {
             for (let i = 0; i < currentPhysicalSourceNames.length; i++) {
                 const name = currentPhysicalSourceNames[i];
                 if (root.knownPhysicalSourceNames.indexOf(name) === -1) {
@@ -612,6 +720,7 @@ except Exception:
                     if (name.indexOf("bluez_input") !== -1 || name.indexOf("bluez_source") !== -1 || (name.indexOf("usb") !== -1 && !isIgnoredUsbSource)) {
                         console.log("[Audio.qml] Auto-switching to newly connected priority input device:", name);
                         root.manualSourceOverride = false;
+                        root.lastPrioritySourceConnectTime = Date.now();
                     }
                 }
             }
@@ -637,16 +746,65 @@ except Exception:
             tracker.objects = trackerObjects;
         }
 
+        if (Pipewire.nodes.values.length === 0) {
+            root.previousSinkName = "";
+            root.previousPhysicalSinkDesc = "";
+            root.previousSourceName = "";
+            root.previousPhysicalSourceDesc = "";
+            root.lastToastedSinkName = "";
+            root.lastToastedSinkTime = 0;
+            root.lastPrioritySinkConnectTime = 0;
+            root.lastToastedSourceName = "";
+            root.lastToastedSourceTime = 0;
+            root.lastPrioritySourceConnectTime = 0;
+        }
+
+        root.updateActiveSink();
+        root.updateActiveSource();
+        root.syncingNodes = false;
+
+        if (root.startupEnumerating && root.startupPendingNodeIds.length > 0) {
+            const stillPending = root.startupPendingNodeIds.filter(id => {
+                const n = Pipewire.nodes.values.find(node => node && node.id === id);
+                return n && !n.ready;
+            });
+            root.startupPendingNodeIds = stillPending;
+            if (stillPending.length === 0 && !startupEnumTimer.running) {
+                root.startupEnumerating = false;
+            }
+        }
+
+        if (root.activePhysicalSinkDesc)
+            root.notifyOutputChanged(root.activePhysicalSinkDesc);
+        if (root.activePhysicalSourceDesc)
+            root.notifyInputChanged(root.activePhysicalSourceDesc);
+
         Qt.callLater(root.updateActiveSink);
         Qt.callLater(root.updateActiveSource);
     }
 
     Component.onCompleted: {
-        previousSinkName = isNodeValid(sink) ? (sink.description || sink.name) : qsTr("Unknown Device");
-        previousSourceName = isNodeValid(source) ? (source.description || source.name) : qsTr("Unknown Device");
-        previousPhysicalSinkDesc = activePhysicalSinkDesc;
-        previousPhysicalSourceDesc = activePhysicalSourceDesc;
+        if (!Quickshell.env("PYTEST_CURRENT_TEST")) {
+            root.startupEnumerating = true;
+            startupEnumTimer.restart();
+        } else if (Pipewire && Pipewire.nodes && Pipewire.nodes.values) {
+            const pending = [];
+            for (const node of Pipewire.nodes.values) {
+                if (node && !node.isStream && !node.ready && node.id !== undefined) {
+                    pending.push(node.id);
+                }
+            }
+            if (pending.length > 0) {
+                root.startupPendingNodeIds = pending;
+                root.startupEnumerating = true;
+                startupEnumTimer.restart();
+            }
+        }
         root.syncNodes();
+        previousSinkName = activePhysicalSinkDesc || qsTr("Unknown Device");
+        previousSourceName = activePhysicalSourceDesc || qsTr("Unknown Device");
+        previousPhysicalSinkDesc = previousSinkName;
+        previousPhysicalSourceDesc = previousSourceName;
     }
 
     Connections {

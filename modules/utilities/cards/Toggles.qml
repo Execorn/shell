@@ -91,12 +91,8 @@ StyledRect {
                     roleValue: "bluetooth"
                     delegate: Toggle {
                         icon: "bluetooth"
-                        checked: Bluetooth.defaultAdapter?.enabled ?? false // qmllint disable unresolved-type
-                        onClicked: {
-                            const adapter = Bluetooth.defaultAdapter; // qmllint disable unresolved-type
-                            if (adapter)
-                                adapter.enabled = !adapter.enabled;
-                        }
+                        checked: Bluez.enabled
+                        onClicked: Bluez.toggleEnabled()
                     }
                 }
                 DelegateChoice {

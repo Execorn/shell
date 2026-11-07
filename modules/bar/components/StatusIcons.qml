@@ -182,7 +182,7 @@ StyledRect {
                 MaterialIcon {
                     animate: true
                     text: {
-                        if (!Bluetooth.defaultAdapter?.enabled) // qmllint disable unresolved-type
+                        if (!Bluez.enabled)
                             return "bluetooth_disabled";
                         if (Bluetooth.devices.values.some(d => d.connected)) // qmllint disable unresolved-type
                             return "bluetooth_connected";

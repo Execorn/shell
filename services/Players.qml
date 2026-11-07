@@ -125,7 +125,7 @@ Singleton {
         if (!title || !artist)
             return;
 
-        const key = `${getIdentity(player)}\0${player.uniqueId}\0${title}\0${artist}`;
+        const key = `${getIdentity(player)}\0${title}\0${artist}`;
         if (key === lastNowPlayingKey)
             return;
 
@@ -133,7 +133,15 @@ Singleton {
         Toaster.toast(qsTr("Now Playing"), qsTr("%1 - %2").arg(artist).arg(title), "music_note");
     }
 
-    onActiveChanged: lastNowPlayingKey = ""
+    onActiveChanged: {
+        const player = root.active;
+        if (!player)
+            return;
+        const title = player.trackTitle ?? "";
+        const artist = player.trackArtist ?? "";
+        if (title && artist)
+            lastNowPlayingKey = `${getIdentity(player)}\0${title}\0${artist}`;
+    }
 
     Connections {
         function onPostTrackChanged(): void {

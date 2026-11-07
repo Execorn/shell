@@ -38,7 +38,11 @@ StyledRect {
         StyledSwitch {
             checked: root.checked
             enabled: root.enabled
-            onToggled: root.toggled(checked)
+            onToggled: {
+                const next = checked;
+                checked = Qt.binding(() => root.checked);
+                root.toggled(next);
+            }
         }
     }
 }

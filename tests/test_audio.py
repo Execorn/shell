@@ -946,7 +946,7 @@ def test_toast_sink_changed(audio_suite):
     QtCore.QCoreApplication.processEvents()
     audio_suite.audio.updateActiveSink()
     
-    assert len(audio_suite.mock_toast.toasts) > 0
+    assert len(audio_suite.mock_toast.toasts) == 1
     assert any("Audio output changed" in t[0] for t in audio_suite.mock_toast.toasts)
 
 def test_toast_source_changed(audio_suite):
@@ -954,13 +954,15 @@ def test_toast_source_changed(audio_suite):
     audio_suite.mock_pw.add_node(n1)
     audio_suite.mock_pw.set_defaultAudioSource(n1)
     QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSource()
     
     n2 = MockPwNode(12, "alsa_input.usb", "USB Mic", is_sink=False, ready=True)
     audio_suite.mock_pw.add_node(n2)
     audio_suite.mock_pw.set_defaultAudioSource(n2)
     QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSource()
     
-    assert len(audio_suite.mock_toast.toasts) > 0
+    assert len(audio_suite.mock_toast.toasts) == 1
     assert any("Audio input changed" in t[0] for t in audio_suite.mock_toast.toasts)
 
 def test_toast_suppressed_initial(audio_suite):
@@ -1638,4 +1640,52 @@ def test_source_fallback_ignores_minifuse_loopback_and_instrument(audio_suite):
 
     best_src = audio_suite.audio.getBestInputSourceName()
     assert best_src == "alsa_input.usb-USB_Streaming_Microphone-00.analog-stereo"
+
+
+def test_bluetooth_connect_reconnect_no_duplicate_toasts_with_virtual_nodes(audio_suite):
+    eq_sink = MockPwNode(10, "riced_equalizer_sink", "Riced Equalizer Sink", is_sink=True, ready=True, properties={"node.virtual": "true"})
+    mic_virt = MockPwNode(11, "riced_microphone_source", "Riced Microphone Source", is_sink=False, ready=True, properties={"node.virtual": "true"})
+    minifuse_sink = MockPwNode(12, "alsa_output.usb-Arturia_MiniFuse_2-00.HiFi__Line1__sink", "MiniFuse 2 Main Out L/R", is_sink=True, ready=True)
+    minifuse_src = MockPwNode(13, "alsa_input.usb-Arturia_MiniFuse_2-00.HiFi__Mic1__source", "MiniFuse 2 Mic/Line/Inst 1 (L)", is_sink=False, ready=True)
+    usb_mic = MockPwNode(14, "alsa_input.usb-C-Media_USB_Streaming_Microphone-00.analog-stereo", "USB Streaming Microphone Analog Stereo", is_sink=False, ready=True)
+
+    audio_suite.mock_pw.add_node(eq_sink)
+    audio_suite.mock_pw.add_node(mic_virt)
+    audio_suite.mock_pw.add_node(minifuse_sink)
+    audio_suite.mock_pw.add_node(minifuse_src)
+    audio_suite.mock_pw.add_node(usb_mic)
+    audio_suite.mock_pw.set_defaultAudioSink(eq_sink)
+    audio_suite.mock_pw.set_defaultAudioSource(mic_virt)
+    QtCore.QCoreApplication.processEvents()
+
+    audio_suite.mock_toast.toasts.clear()
+
+    bt_sink = MockPwNode(20, "bluez_output.AA_BB_CC.1", "Sony WH-1000XM5", is_sink=True, ready=True)
+    bt_src = MockPwNode(21, "bluez_input.AA_BB_CC.0", "Sony WH-1000XM5 Handsfree", is_sink=False, ready=True)
+    audio_suite.mock_pw.add_node(bt_sink)
+    audio_suite.mock_pw.add_node(bt_src)
+    audio_suite.mock_pw.set_defaultAudioSource(bt_src)
+    QtCore.QCoreApplication.processEvents()
+
+    out_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio output changed"]
+    in_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio input changed"]
+    assert len(out_toasts) == 1
+    assert out_toasts[0][1] == "Now using: Sony WH-1000XM5"
+    assert len(in_toasts) == 1
+    assert in_toasts[0][1] == "Now using: Sony WH-1000XM5 Handsfree"
+
+    audio_suite.mock_toast.toasts.clear()
+
+    audio_suite.mock_pw.set_defaultAudioSource(minifuse_src)
+    audio_suite.mock_pw.remove_node(bt_sink)
+    audio_suite.mock_pw.remove_node(bt_src)
+    QtCore.QCoreApplication.processEvents()
+
+    out_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio output changed"]
+    in_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio input changed"]
+    assert len(out_toasts) == 1
+    assert out_toasts[0][1] == "Now using: MiniFuse 2 Main Out L/R"
+    assert len(in_toasts) == 1
+    assert in_toasts[0][1] == "Now using: USB Streaming Microphone Analog Stereo"
+
 

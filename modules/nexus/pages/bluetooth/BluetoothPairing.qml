@@ -19,9 +19,14 @@ PageBase {
     property bool pairFailed: false
 
     function setScan(on: bool): void {
-        if (adapter?.enabled) {
-            adapter.pairable = on;
-            adapter.discovering = on;
+        if (on) {
+            if (adapter?.enabled)
+                adapter.pairable = true;
+            Bluez.setDiscovering(true);
+        } else {
+            if (adapter?.enabled)
+                adapter.pairable = false;
+            Bluez.setDiscovering(false);
         }
     }
 

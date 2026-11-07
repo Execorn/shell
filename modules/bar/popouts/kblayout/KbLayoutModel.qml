@@ -109,8 +109,11 @@ Item {
         if (!GlobalConfig.utilities.toasts.kbLimit)
             return;
 
-        if (layoutsModel.count > 4) {
+        if (layoutsModel.count > 4 && !_notifiedLimit) {
+            _notifiedLimit = true;
             Toaster.toast(qsTr("Keyboard layout limit"), qsTr("XKB supports only 4 layouts at a time"), "warning");
+        } else if (layoutsModel.count <= 4) {
+            _notifiedLimit = false;
         }
     }
 

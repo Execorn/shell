@@ -40,7 +40,7 @@ This repository is **Execorn's** high-performance fork of [caelestia-dots/shell]
 | `shell.qml` | Root Quickshell entry point and lazy loader orchestration |
 | `plugin/src/Caelestia/` | C++20 Qt6 QML plugins (`Blobs`, `Components`, `Config`, `Images`, `Internal`, `Models`, `Services`) |
 | `modules/` | QML UI modules (`bar`, `dashboard`, `drawers`, `launcher`, `lock`, `newsfeed`, `nexus`, `notifications`, `osd`, `overview`, `session`, `sidebar`, `utilities`, `windowinfo`, `cheatsheet`, `areapicker`, `background`) |
-| `services/` | QML singleton services (`Audio`, `Brightness`, `Colours`, `GameMode`, `Hypr`, `NetworkUsage`, `Nmcli`, `Notifs`, `Ocr`, `Players`, `Recorder`, `ScreenTemp`, `VPN`, `Wallpapers`, `Weather`) |
+| `services/` | QML singleton services (`Audio`, `Bluez`, `Brightness`, `Colours`, `GameMode`, `Hypr`, `NetworkUsage`, `Nmcli`, `Notifs`, `Ocr`, `Players`, `Recorder`, `ScreenTemp`, `VPN`, `Wallpapers`, `Weather`) |
 | `components/` | Reusable Material 3 QML controls, containers, image caches, and shader effects |
 | `scripts/` | Theme application (`apply-theme.py`), `wwal` integration (`wwal-helper.py`), and QML linting (`qml-lint-conventions.py`) |
 | `tests/` | PySide6 offscreen QML and Python integration test suite |

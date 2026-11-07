@@ -15,7 +15,7 @@ PageBase {
     id: root
 
     readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter // qmllint disable unresolved-type
-    readonly property bool btEnabled: adapter?.enabled ?? false
+    readonly property bool btEnabled: Bluez.enabled
 
     title: qsTr("Connected devices")
 
@@ -32,8 +32,9 @@ PageBase {
             horizontalPadding: Tokens.padding.largeIncreased
             checked: root.btEnabled
             onToggled: {
-                if (root.adapter)
-                    root.adapter.enabled = checked;
+                const next = checked;
+                checked = Qt.binding(() => root.btEnabled);
+                Bluez.setEnabled(next);
             }
         }
 
@@ -53,7 +54,7 @@ PageBase {
 
                 required property BluetoothDevice modelData
                 readonly property bool connected: modelData && modelData.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
-                readonly property bool loading: modelData && (modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting) // qmllint disable unresolved-type
+                readonly property bool loading: modelData && (modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting || (Bluez.enabling && Bluez.pendingConnectDevice === modelData)) // qmllint disable unresolved-type
                 property real textOpacity: loading ? 0.5 : 1
 
                 anchors.left: savedList.list.contentItem.left
@@ -73,9 +74,7 @@ PageBase {
                     onClicked: {
                         if (!device.modelData || device.loading)
                             return;
-                        if (!device.connected && !device.modelData.trusted)
-                            device.modelData.trusted = true;
-                        device.modelData.connected = !device.connected;
+                        Bluez.toggleDeviceConnection(device.modelData);
                     }
                 }
 
@@ -218,8 +217,10 @@ PageBase {
             opacity: root.btEnabled ? 1 : 0.5
             checked: root.adapter?.discoverable ?? false
             onToggled: {
+                const next = checked;
+                checked = Qt.binding(() => root.adapter?.discoverable ?? false);
                 if (root.adapter)
-                    root.adapter.discoverable = checked;
+                    root.adapter.discoverable = next;
             }
 
             Behavior on opacity {
@@ -235,8 +236,10 @@ PageBase {
             opacity: root.btEnabled ? 1 : 0.5
             checked: root.adapter?.pairable ?? false
             onToggled: {
+                const next = checked;
+                checked = Qt.binding(() => root.adapter?.pairable ?? false);
                 if (root.adapter)
-                    root.adapter.pairable = checked;
+                    root.adapter.pairable = next;
             }
 
             Behavior on opacity {

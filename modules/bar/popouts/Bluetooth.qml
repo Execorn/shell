@@ -27,22 +27,14 @@ ColumnLayout {
 
     Toggle {
         label: qsTr("Enabled")
-        checked: Bluetooth.defaultAdapter?.enabled ?? false // qmllint disable unresolved-type
-        toggle.onToggled: {
-            const adapter = Bluetooth.defaultAdapter; // qmllint disable unresolved-type
-            if (adapter)
-                adapter.enabled = checked;
-        }
+        checked: Bluez.enabled
+        onToggled: checked => Bluez.setEnabled(checked)
     }
 
     Toggle {
         label: qsTr("Discovering")
-        checked: Bluetooth.defaultAdapter?.discovering ?? false // qmllint disable unresolved-type
-        toggle.onToggled: {
-            const adapter = Bluetooth.defaultAdapter; // qmllint disable unresolved-type
-            if (adapter)
-                adapter.discovering = checked;
-        }
+        checked: Bluez.discovering
+        onToggled: checked => Bluez.setDiscovering(checked)
     }
 
     StyledText {
@@ -69,7 +61,7 @@ ColumnLayout {
             id: device
 
             required property BluetoothDevice modelData
-            readonly property bool loading: modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+            readonly property bool loading: modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting || (Bluez.enabling && Bluez.pendingConnectDevice === modelData) // qmllint disable unresolved-type
 
             Layout.fillWidth: true
             Layout.rightMargin: Tokens.padding.extraSmall
@@ -128,11 +120,7 @@ ColumnLayout {
                 StateLayer {
                     color: device.modelData.state === BluetoothDeviceState.Connected ? Colours.palette.m3onPrimary : Colours.palette.m3onSurface // qmllint disable unresolved-type
                     disabled: device.loading
-                    onClicked: {
-                        if (!device.modelData.connected && !device.modelData.trusted)
-                            device.modelData.trusted = true;
-                        device.modelData.connected = !device.modelData.connected;
-                    }
+                    onClicked: Bluez.toggleDeviceConnection(device.modelData)
                 }
 
                 MaterialIcon {
@@ -188,9 +176,13 @@ ColumnLayout {
     }
 
     component Toggle: RowLayout {
+        id: toggleRow
+
         required property string label
-        property alias checked: toggle.checked
+        required property bool checked
         property alias toggle: toggle
+
+        signal toggled(checked: bool)
 
         Layout.fillWidth: true
         Layout.rightMargin: Tokens.padding.extraSmall
@@ -198,11 +190,18 @@ ColumnLayout {
 
         StyledText {
             Layout.fillWidth: true
-            text: parent.label
+            text: toggleRow.label
         }
 
         StyledSwitch {
             id: toggle
+
+            checked: toggleRow.checked
+            onToggled: {
+                const next = checked;
+                checked = Qt.binding(() => toggleRow.checked);
+                toggleRow.toggled(next);
+            }
         }
     }
 }

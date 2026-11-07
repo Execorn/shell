@@ -9,9 +9,24 @@ Scope {
     id: root
 
     readonly property list<var> warnLevels: [...GlobalConfig.general.battery.warnLevels].sort((a, b) => b.level - a.level)
+    property bool initialized: false
+    property bool lastOnBattery: UPower.onBattery
+
+    Component.onCompleted: {
+        Qt.callLater(() => {
+            root.lastOnBattery = UPower.onBattery;
+            root.initialized = true;
+        });
+    }
 
     Connections {
         function onOnBatteryChanged(): void {
+            if (!root.initialized || UPower.onBattery === root.lastOnBattery) {
+                root.lastOnBattery = UPower.onBattery;
+                return;
+            }
+            root.lastOnBattery = UPower.onBattery;
+
             if (UPower.onBattery) {
                 if (GlobalConfig.utilities.toasts.chargingChanged)
                     Toaster.toast(qsTr("Charger unplugged"), qsTr("Battery is discharging"), "power_off");

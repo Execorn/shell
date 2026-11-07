@@ -88,16 +88,16 @@ Singleton {
             setDynamicConfs();
             if (isReady) {
                 Quickshell.execDetached(["/home/execorn/scripts/disable_monitors.sh"]);
+                if (GlobalConfig.utilities.toasts.gameModeChanged)
+                    Toaster.toast(qsTr("Game mode enabled"), qsTr("Disabled Hyprland animations, blur, gaps and shadows"), "gamepad");
             }
-            if (GlobalConfig.utilities.toasts.gameModeChanged)
-                Toaster.toast(qsTr("Game mode enabled"), qsTr("Disabled Hyprland animations, blur, gaps and shadows"), "gamepad");
         } else {
             restoreConfs();
             if (isReady) {
                 Quickshell.execDetached(["/home/execorn/scripts/enable_monitors.sh"]);
+                if (GlobalConfig.utilities.toasts.gameModeChanged)
+                    Toaster.toast(qsTr("Game mode disabled"), qsTr("Hyprland settings restored"), "gamepad");
             }
-            if (GlobalConfig.utilities.toasts.gameModeChanged)
-                Toaster.toast(qsTr("Game mode disabled"), qsTr("Hyprland settings restored"), "gamepad");
         }
     }
 
