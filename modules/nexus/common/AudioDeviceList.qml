@@ -30,7 +30,7 @@ ItemList {
 
         required property PwNode modelData
         required property int index
-        readonly property bool active: device.modelData?.id === root.currentId
+        readonly property bool active: root.currentId !== -1 && device.modelData?.id === root.currentId
 
         anchors.left: root.list.contentItem.left
         anchors.right: root.list.contentItem.right

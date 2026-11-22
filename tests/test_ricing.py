@@ -87,6 +87,7 @@ class OverrideMockProcess(QObject):
     stdoutChanged = Signal('QVariant')
     stderrChanged = Signal('QVariant')
     exitCodeChanged = Signal(int)
+    exited = Signal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -134,10 +135,12 @@ class OverrideMockProcess(QObject):
                 from PySide6.QtCore import QTimer
                 def run_proc():
                     import subprocess
+                    rc = 0
                     try:
-                        res = subprocess.run([str(x) for x in self._command], capture_output=True, text=True)
-                        self._exitCode = res.returncode
-                        self.exitCodeChanged.emit(res.returncode)
+                        res = subprocess.run([str(x) for x in self._command], capture_output=True, text=True, timeout=0.35)
+                        rc = res.returncode
+                        self._exitCode = rc
+                        self.exitCodeChanged.emit(rc)
                         if self._stdout:
                             self._stdout.setProperty("text", res.stdout)
                             if hasattr(self._stdout, "streamFinished"):
@@ -154,9 +157,13 @@ class OverrideMockProcess(QObject):
                                     pass
                     except Exception as e:
                         print("OverrideMockProcess error:", e)
+                        rc = 1
+                        self._exitCode = rc
+                        self.exitCodeChanged.emit(rc)
                     self._running = False
                     try:
                         self.runningChanged.emit(False)
+                        self.exited.emit(rc, 0)
                     except RuntimeError:
                         pass
                 QTimer.singleShot(0, run_proc)

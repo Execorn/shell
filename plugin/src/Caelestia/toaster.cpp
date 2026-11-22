@@ -1,37 +1,71 @@
 #include "toaster.hpp"
 
+#include <qcoreapplication.h>
 #include <qlogging.h>
+#include <qthread.h>
 #include <qtimer.h>
 
 namespace caelestia {
 
 namespace {
 
+bool matchesTranslatedTitle(const QString& title, const char* context, const char* sourceText) {
+    return title == QLatin1String(sourceText) || title == QCoreApplication::translate(context, sourceText);
+}
+
 QString toastCategory(const QString& title) {
-    if (title == QLatin1String("Caps lock enabled") || title == QLatin1String("Caps lock disabled")) {
+    if (matchesTranslatedTitle(title, "Hypr", "Caps lock enabled") ||
+        matchesTranslatedTitle(title, "Hypr", "Caps lock disabled")) {
         return QStringLiteral("capslock");
     }
-    if (title == QLatin1String("Num lock enabled") || title == QLatin1String("Num lock disabled")) {
+    if (matchesTranslatedTitle(title, "Hypr", "Num lock enabled") ||
+        matchesTranslatedTitle(title, "Hypr", "Num lock disabled")) {
         return QStringLiteral("numlock");
     }
-    if (title == QLatin1String("Do not disturb enabled") || title == QLatin1String("Do not disturb disabled")) {
+    if (matchesTranslatedTitle(title, "Notifs", "Do not disturb enabled") ||
+        matchesTranslatedTitle(title, "Notifs", "Do not disturb disabled")) {
         return QStringLiteral("dnd");
     }
-    if (title == QLatin1String("Game mode enabled") || title == QLatin1String("Game mode disabled")) {
+    if (matchesTranslatedTitle(title, "GameMode", "Game mode enabled") ||
+        matchesTranslatedTitle(title, "GameMode", "Game mode disabled")) {
         return QStringLiteral("gamemode");
     }
-    if (title == QLatin1String("Charger plugged in") || title == QLatin1String("Charger unplugged")) {
+    if (matchesTranslatedTitle(title, "BatteryMonitor", "Charger plugged in") ||
+        matchesTranslatedTitle(title, "BatteryMonitor", "Charger unplugged")) {
         return QStringLiteral("charger");
     }
-    if (title.startsWith(QLatin1String("VPN "))) {
+    if (title.startsWith(QLatin1String("VPN ")) || matchesTranslatedTitle(title, "VPN", "VPN connected") ||
+        matchesTranslatedTitle(title, "VPN", "VPN disconnected") ||
+        matchesTranslatedTitle(title, "VPN", "VPN authentication required") ||
+        matchesTranslatedTitle(title, "VPN", "VPN error")) {
         return QStringLiteral("vpn");
     }
-    if (title == QLatin1String("Audio output changed") || title == QLatin1String("Audio input changed") ||
-        title == QLatin1String("Keyboard layout changed") || title == QLatin1String("Keyboard layout limit") ||
-        title == QLatin1String("Now Playing") || title == QLatin1String("Config loaded") ||
-        title == QLatin1String("Wallpaper on Boot") || title == QLatin1String("Wallpaper Slideshow") ||
-        title == QLatin1String("Slideshow Interval") || title == QLatin1String("Monitors") ||
-        title == QLatin1String("Equalizer")) {
+    if (matchesTranslatedTitle(title, "Audio", "Audio output changed")) {
+        return QStringLiteral("audio-output");
+    }
+    if (matchesTranslatedTitle(title, "Audio", "Audio input changed")) {
+        return QStringLiteral("audio-input");
+    }
+    if (matchesTranslatedTitle(title, "Hypr", "Keyboard layout changed")) {
+        return QStringLiteral("kb-layout");
+    }
+    if (matchesTranslatedTitle(title, "KbLayoutModel", "Keyboard layout limit")) {
+        return QStringLiteral("kb-limit");
+    }
+    if (matchesTranslatedTitle(title, "Players", "Now Playing")) {
+        return QStringLiteral("now-playing");
+    }
+    if (matchesTranslatedTitle(title, "ConfigToasts", "Config loaded")) {
+        return QStringLiteral("config-loaded");
+    }
+    if (matchesTranslatedTitle(title, "EQs", "Equalizer")) {
+        return QStringLiteral("equalizer");
+    }
+    if (matchesTranslatedTitle(title, "Monitors", "Monitors")) {
+        return QStringLiteral("monitors");
+    }
+    if (title == QLatin1String("Wallpaper on Boot") || title == QLatin1String("Wallpaper Slideshow") ||
+        title == QLatin1String("Slideshow Interval")) {
         return title;
     }
     return QString();
@@ -39,14 +73,16 @@ QString toastCategory(const QString& title) {
 
 } // namespace
 
-Toast::Toast(const QString& title, const QString& message, const QString& icon, Type type, int timeout, QObject* parent)
+Toast::Toast(const QString& title, const QString& message, const QString& icon, Type type, int timeout,
+    const QString& category, QObject* parent)
     : QObject(parent)
     , m_closed(false)
     , m_title(title)
     , m_message(message)
     , m_icon(icon)
     , m_type(type)
-    , m_timeout(timeout) {
+    , m_timeout(timeout)
+    , m_category(category) {
     if (m_icon.isEmpty()) {
         switch (m_type) {
         case Type::Success:
@@ -105,6 +141,10 @@ Toast::Type Toast::type() const {
     return m_type;
 }
 
+QString Toast::category() const {
+    return m_category;
+}
+
 void Toast::close() {
     if (!m_closed) {
         m_closed = true;
@@ -134,21 +174,34 @@ QQmlListProperty<Toast> Toaster::toasts() {
     return QQmlListProperty<Toast>(this, &m_toasts);
 }
 
-void Toaster::toast(const QString& title, const QString& message, const QString& icon, Toast::Type type, int timeout) {
-    const QString category = toastCategory(title);
+void Toaster::toast(const QString& title, const QString& message, const QString& icon, Toast::Type type, int timeout,
+    const QString& category) {
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, title, message, icon, type, timeout, category]() {
+                toast(title, message, icon, type, timeout, category);
+            },
+            Qt::QueuedConnection);
+        return;
+    }
+
+    const QString resolvedCategory = !category.isEmpty() ? category : toastCategory(title);
     const auto currentToasts = m_toasts;
     for (auto* existing : currentToasts) {
         if (!existing || existing->closed()) {
             continue;
         }
         const bool exactMatch = existing->title() == title && existing->message() == message;
-        const bool categoryMatch = !category.isEmpty() && toastCategory(existing->title()) == category;
+        const QString existingCategory =
+            !existing->category().isEmpty() ? existing->category() : toastCategory(existing->title());
+        const bool categoryMatch = !resolvedCategory.isEmpty() && existingCategory == resolvedCategory;
         if (exactMatch || categoryMatch) {
             existing->close();
         }
     }
 
-    auto* toast = new Toast(title, message, icon, type, timeout, this);
+    auto* toast = new Toast(title, message, icon, type, timeout, resolvedCategory, this);
     QObject::connect(toast, &Toast::finishedClose, this, [toast, this]() {
         if (m_toasts.removeOne(toast)) {
             emit toastsChanged();

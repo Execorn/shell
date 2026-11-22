@@ -24,9 +24,9 @@ PageBase {
             first: true
             icon: Icons.getVolumeIcon(Audio.volume, Audio.muted)
             label: qsTr("Output")
-            valueLabel: Math.round(value * 100) + "%"
+            valueLabel: Audio.muted ? qsTr("Muted") : Math.round(value * 100) + "%"
+            to: GlobalConfig.services.maxVolume
             value: Audio.volume
-            enabled: !Audio.muted
             onMoved: v => Audio.setVolume(v)
         }
 
@@ -51,16 +51,16 @@ PageBase {
             first: true
             icon: Icons.getMicVolumeIcon(Audio.sourceVolume, Audio.sourceMuted)
             label: qsTr("Input")
-            valueLabel: Math.round(value * 100) + "%"
+            valueLabel: Audio.sourceMuted ? qsTr("Muted") : Math.round(value * 100) + "%"
+            to: GlobalConfig.services.maxVolume
             value: Audio.sourceVolume
-            enabled: !Audio.sourceMuted
             onMoved: v => Audio.setSourceVolume(v)
         }
 
         ToggleRow {
             text: qsTr("Muted")
             checked: Audio.sourceMuted
-            onToggled: Audio.setStreamMuted(Audio.source, checked)
+            onToggled: Audio.setSourceMuted(checked)
         }
 
         AudioDeviceList {

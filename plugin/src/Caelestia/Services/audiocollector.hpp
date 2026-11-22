@@ -28,13 +28,9 @@ public:
         }
     }
 
-    bool try_lock() {
-        return !m_flag.test_and_set(std::memory_order_acquire);
-    }
+    bool try_lock() { return !m_flag.test_and_set(std::memory_order_acquire); }
 
-    void unlock() {
-        m_flag.clear(std::memory_order_release);
-    }
+    void unlock() { m_flag.clear(std::memory_order_release); }
 
 private:
     std::atomic_flag m_flag{};
@@ -48,17 +44,18 @@ class PipeWireWorker {
 public:
     explicit PipeWireWorker(std::stop_token token, AudioCollector* collector);
 
-    void run();
-
 private:
     pw_main_loop* m_loop;
     pw_stream* m_stream;
     spa_source* m_timer;
+    spa_source* m_wakeup;
     bool m_idle;
+    bool m_wasConnected;
 
     std::stop_token m_token;
     AudioCollector* m_collector;
 
+    void cleanup();
     static void handleTimeout(void* data, uint64_t expirations);
     void streamStateChanged(pw_stream_state state);
     void processStream();
@@ -72,6 +69,7 @@ public:
     AudioCollector& operator=(const AudioCollector&) = delete;
 
     static AudioCollector& instance();
+    static AudioCollector* existingInstance();
 
     void clearBuffer();
     void loadChunk(const qint16* samples, quint32 count);
@@ -82,17 +80,17 @@ private:
     explicit AudioCollector(QObject* parent = nullptr);
     ~AudioCollector() override;
 
+    static inline std::atomic<AudioCollector*> s_instance{ nullptr };
+    static inline std::atomic<bool> s_destroyed{ false };
+
     std::jthread m_thread;
     util::RingBuffer<float> m_samples;
     ac::SpinLock m_samplesLock;
     util::RingBuffer<float> m_pending; // Writer thread only, holds chunks which arrived while a reader had the lock
     std::atomic<bool> m_discardPending;
-    quint32 m_sampleCount;
 
-    template <typename T>
-    quint32 readLatest(T* out, quint32 count);
+    template <typename T> quint32 readLatest(T* out, quint32 count);
 
-    void reload();
     void start() override;
     void stop() override;
 };

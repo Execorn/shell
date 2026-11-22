@@ -262,11 +262,13 @@ StyledListView {
         const text = search.text;
         const prefix = GlobalConfig.launcher.actionPrefix;
         if (text.startsWith(prefix)) {
-            if (text.startsWith(`${prefix}preset`))
+            const lower = text.toLowerCase();
+            const lowerPrefix = prefix.toLowerCase();
+            if (lower.startsWith(`${lowerPrefix}preset`))
                 return "eq";
 
             for (const action of ["calc", "scheme", "variant", "eq", "monitors", "gamemode", "slideshow"])
-                if (text.startsWith(`${prefix}${action} `) || text === `${prefix}${action}`)
+                if (lower.startsWith(`${lowerPrefix}${action} `) || lower === `${lowerPrefix}${action}`)
                     return action;
 
             return "actions";

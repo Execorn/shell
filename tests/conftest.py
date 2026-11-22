@@ -5,7 +5,7 @@ import pathlib
 import pytest
 from PySide6.QtCore import QObject, Signal, Slot, Property, ClassInfo
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtQml import QQmlEngine, qmlRegisterType, qmlRegisterSingletonInstance, QmlAttached
+from PySide6.QtQml import QQmlEngine, qmlRegisterType, qmlRegisterSingletonInstance, qmlRegisterSingletonType, QmlAttached
 from PySide6.QtQuick import QQuickItem
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -16,7 +16,7 @@ os.environ["QML_DISABLE_DISK_CACHE"] = "1"
 os.environ.pop("QML2_IMPORT_PATH", None)
 os.environ.pop("QML_IMPORT_PATH", None)
 
-# Setup wpctl mock binary interception mechanism
+# Setup wpctl / wlsunset / pactl / rfkill mock binary interception mechanism
 bin_dir = pathlib.Path("/tmp/caelestia-test-bin")
 bin_dir.mkdir(parents=True, exist_ok=True)
 wpctl_path = bin_dir / "wpctl"
@@ -26,6 +26,60 @@ wpctl_path.chmod(0o755)
 wlsunset_path = bin_dir / "wlsunset"
 wlsunset_path.write_text("#!/bin/bash\necho \"$@\" >> /tmp/wlsunset_calls.log\nsleep 9999\n")
 wlsunset_path.chmod(0o755)
+
+pactl_path = bin_dir / "pactl"
+pactl_path.write_text("""#!/usr/bin/env python3
+import json, os, sys
+state_file = os.environ.get("CAELESTIA_TEST_PACTL_STATE", "")
+log_file = os.environ.get("CAELESTIA_TEST_PACTL_LOG", "/tmp/pactl_calls.log")
+args = sys.argv[1:]
+state = {}
+if state_file and os.path.exists(state_file):
+    try:
+        with open(state_file, "r", encoding="utf-8") as f:
+            state = json.load(f)
+    except Exception:
+        state = {}
+
+json_mode = False
+if "-f" in args:
+    idx = args.index("-f")
+    if idx + 1 < len(args) and args[idx + 1] == "json":
+        json_mode = True
+    args = args[:idx] + args[idx + 2:]
+
+cmd = args[0] if args else ""
+if cmd == "list" and len(args) >= 2:
+    what = args[1]
+    if json_mode:
+        print(json.dumps(state.get(what, [])))
+    elif what == "cards":
+        print(state.get("cards_text", ""))
+    elif what == "short" or (len(args) >= 3 and args[2] == "short"):
+        print(state.get(f"{what}_short", ""))
+    sys.exit(0)
+if cmd == "get-default-sink":
+    print(state.get("default_sink", "mock"))
+    sys.exit(0)
+if cmd == "get-default-source":
+    print(state.get("default_source", "mock"))
+    sys.exit(0)
+with open(log_file, "a", encoding="utf-8") as f:
+    f.write(" ".join(args) + "\\n")
+sys.exit(int(state.get("mutate_rc", 0)))
+""")
+pactl_path.chmod(0o755)
+
+rfkill_path = bin_dir / "rfkill"
+rfkill_path.write_text("""#!/usr/bin/env python3
+import json, os, sys
+rfkill_file = os.environ.get("CAELESTIA_TEST_RFKILL_JSON", "")
+if rfkill_file and os.path.exists(rfkill_file):
+    sys.stdout.write(open(rfkill_file, "r", encoding="utf-8").read())
+else:
+    print(json.dumps({"rfkilldevices": []}))
+""")
+rfkill_path.chmod(0o755)
 
 # Prepend mock bin to PATH
 original_path = os.environ.get("PATH", "")
@@ -37,7 +91,8 @@ shutil.rmtree(base_import_path, ignore_errors=True)
 
 mocks = {
     'Quickshell': {
-        'qmldir': 'module Quickshell\nSingleton 1.0 Singleton.qml\nIpcHandler 1.0 IpcHandler.qml\nScope 1.0 Scope.qml\nLazyLoader 1.0 LazyLoader.qml\nVariants 1.0 Variants.qml\nShellScreen 1.0 ShellScreen.qml\nScriptModel 1.0 ScriptModel.qml\nClippingRectangle 1.0 ClippingRectangle.qml\nTransformWatcher 1.0 TransformWatcher.qml\nNotifData 1.0 NotifData.qml\nRegion 1.0 Region.qml\nPanelWindow 1.0 PanelWindow.qml\nPersistentProperties 1.0 PersistentProperties.qml\n',
+        'qmldir': 'module Quickshell\nsingleton Quickshell 1.0 Quickshell.qml\nSingleton 1.0 Singleton.qml\nIpcHandler 1.0 IpcHandler.qml\nScope 1.0 Scope.qml\nLazyLoader 1.0 LazyLoader.qml\nVariants 1.0 Variants.qml\nShellScreen 1.0 ShellScreen.qml\nScriptModel 1.0 ScriptModel.qml\nClippingRectangle 1.0 ClippingRectangle.qml\nTransformWatcher 1.0 TransformWatcher.qml\nNotifData 1.0 NotifData.qml\nRegion 1.0 Region.qml\nPanelWindow 1.0 PanelWindow.qml\nPersistentProperties 1.0 PersistentProperties.qml\n',
+        'Quickshell.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    function env(name) { return name === "PYTEST_CURRENT_TEST" ? "1" : ""; }\n    function execDetached(cmd) {}\n    function shellPath(p) { return p; }\n}\n',
         'Singleton.qml': 'import QtQuick\nQtObject {\n    default property var children\n}\n',
         'IpcHandler.qml': 'import QtQuick\nQtObject {\n    property string target: \"\"\n}\n',
         'Scope.qml': 'import QtQuick\nItem {\n    default property var data\n}\n',
@@ -68,15 +123,16 @@ mocks = {
         'Notification.qml': 'import QtQuick\nQtObject {\n    property string id: ""\n    property string summary: ""\n    property string body: ""\n    property string appIcon: ""\n    property string appName: ""\n    property string image: ""\n    property real expireTimeout: 0\n    property var hints: ({})\n    property int urgency: 0\n    property bool resident: false\n    property bool hasActionIcons: false\n    property list<var> actions: []\n    signal closed()\n    signal summaryChanged()\n    signal bodyChanged()\n    signal appIconChanged()\n    signal appNameChanged()\n    signal imageChanged()\n    signal expireTimeoutChanged()\n    signal urgencyChanged()\n    signal residentChanged()\n    signal hasActionIconsChanged()\n    signal actionsChanged()\n    signal hintsChanged()\n    function dismiss() {}\n}\n'
     },
     'Caelestia': {
-        'qmldir': 'module Caelestia\nDummy 1.0 Dummy.qml\n',
+        'qmldir': 'module Caelestia\nDummy 1.0 Dummy.qml\nToast 1.0 Toast.qml\n',
         'Dummy.qml': 'import QtQuick\nItem {}\n',
-        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true\n        }\n    })\n    property var notifs: ({\n        defaultExpireTimeout: 5000,\n        fullscreenExpireTimeout: 10000,\n        expire: true\n    })\n}\n',
-        'Tokens.qml': 'import QtQuick\nQtObject {\n    property var padding: ({\n        medium: 12.0,\n        extraSmall: 4.0\n    })\n    property var spacing: ({\n        medium: 8.0,\n        small: 4.0\n    })\n    property var rounding: ({\n        full: 9999.0,\n        medium: 8.0,\n        small: 4.0\n    })\n    property var anim: ({\n        durations: {\n            normal: 200,\n            fast: 100,\n            slow: 300\n        }\n    })\n    property var font: ({\n        body: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        title: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        headline: {\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        label: {\n            large: {\n                weight: function(w) { return this; },\n                build: function() { return "Google Sans"; }\n            },\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        }\n    })\n}\n',
-        'Colours.qml': 'import QtQuick\nQtObject {\n    property var palette: ({\n        m3primaryContainer: "#000000",\n        m3onPrimaryContainer: "#ffffff"\n    })\n    property var tPalette: ({\n        m3surfaceContainerLow: "#000000",\n        m3surfaceContainer: "#000000",\n        m3outline: "#000000",\n        m3outlineVariant: "#000000"\n    })\n}\n'
+        'Toast.qml': 'import QtQuick\nQtObject {\n    enum Type {\n        Info = 0,\n        Success,\n        Warning,\n        Error\n    }\n    property bool closed: false\n    property string title: ""\n    property string message: ""\n    property string icon: ""\n    property int timeout: 5000\n    property int type: Toast.Info\n    property string category: ""\n    signal finishedClose()\n    function close() { closed = true; }\n    function lock(s) {}\n    function unlock(s) {}\n}\n',
+        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    signal loaded()\n    signal loadFailed(string error, string screen)\n    signal saveFailed(string error, string screen)\n    signal unknownOption(string key, string screen)\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        enabled: true,\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true,\n            kbLayoutChanged: true,\n            configLoaded: false,\n            fullscreen: "important"\n        }\n    })\n    property var osd: ({\n        enabled: true,\n        hideDelay: 1500,\n        enableMicrophone: false,\n        enableBrightness: true\n    })\n    property var bar: ({\n        popouts: {\n            activeIndicator: false\n        }\n    })\n    property var notifs: ({\n        defaultExpireTimeout: 5000,\n        fullscreenExpireTimeout: 10000,\n        expire: true\n    })\n}\n',
+        'Tokens.qml': 'import QtQuick\nQtObject {\n    property var sizes: ({\n        bar: {\n            audioWidth: 320,\n            bluetoothWidth: 320\n        },\n        utilities: {\n            toastWidth: 320\n        },\n        notifs: {\n            image: 48\n        }\n    })\n    property var padding: ({\n        large: 16.0,\n        medium: 12.0,\n        small: 8.0,\n        extraSmall: 4.0\n    })\n    property var spacing: ({\n        large: 12.0,\n        medium: 8.0,\n        small: 4.0,\n        extraSmall: 4.0\n    })\n    property var rounding: ({\n        full: 9999.0,\n        large: 12.0,\n        medium: 8.0,\n        small: 4.0,\n        extraSmall: 2.0\n    })\n    property var anim: ({\n        durations: {\n            scale: 1.0,\n            normal: 200,\n            fast: 100,\n            slow: 300\n        }\n    })\n    property var font: ({\n        icon: {\n            large: "Material Symbols Rounded",\n            medium: "Material Symbols Rounded",\n            small: "Material Symbols Rounded",\n            builders: {\n                large: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                },\n                medium: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                },\n                small: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                }\n            }\n        },\n        body: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        title: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        headline: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        label: {\n            large: {\n                weight: function(w) { return this; },\n                build: function() { return "Google Sans"; }\n            },\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        }\n    })\n}\n',
+        'Colours.qml': 'import QtQuick\nQtObject {\n    function layer(c, lvl) { return c; }\n    property var palette: ({\n        m3primary: "#ffffff",\n        m3primaryContainer: "#000000",\n        m3onPrimaryContainer: "#ffffff",\n        m3secondary: "#333333",\n        m3onSecondary: "#ffffff",\n        m3secondaryContainer: "#222222",\n        m3onSecondaryContainer: "#ffffff",\n        m3success: "#22aa44",\n        m3onSuccess: "#ffffff",\n        m3successContainer: "#114422",\n        m3onSuccessContainer: "#ccffcc",\n        m3surface: "#101010",\n        m3surfaceContainer: "#111111",\n        m3surfaceContainerHigh: "#222222",\n        m3onSurface: "#ffffff",\n        m3onSurfaceVariant: "#cccccc",\n        m3outline: "#666666",\n        m3outlineVariant: "#444444",\n        m3error: "#ff4444",\n        m3onError: "#000000",\n        m3errorContainer: "#660000",\n        m3onErrorContainer: "#ffcccc"\n    })\n    property var tPalette: ({\n        m3surfaceContainerLow: "#000000",\n        m3surfaceContainer: "#000000",\n        m3outline: "#000000",\n        m3outlineVariant: "#000000"\n    })\n}\n'
     },
     'Caelestia/Config': {
         'qmldir': 'module Caelestia.Config\nsingleton TokenConfig 1.0 TokenConfig.qml\n',
-        'TokenConfig.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    readonly property var sizes: ({\n        notifs: {\n            image: 48\n        }\n    })\n}\n'
+        'TokenConfig.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    signal loadFailed(string error, string screen)\n    signal unknownOption(string key, string screen)\n    readonly property var sizes: ({\n        notifs: {\n            image: 48\n        }\n    })\n}\n',
     },
     'Caelestia/Services': {
         'qmldir': 'module Caelestia.Services\nCavaProvider 1.0 CavaProvider.qml\nBeatTracker 1.0 BeatTracker.qml\n',
@@ -84,28 +140,31 @@ mocks = {
         'BeatTracker.qml': 'import QtQuick\nItem {}\n'
     },
     'qs/services': {
-        'qmldir': 'module qs.services\nsingleton Audio 1.0 Audio.qml\nsingleton Hypr 1.0 Hypr.qml\nsingleton Screens 1.0 Screens.qml\nsingleton Weather 1.0 Weather.qml\nsingleton Nmcli 1.0 Nmcli.qml\nsingleton Notifs 1.0 Notifs.qml\nsingleton ScreenTemp 1.0 ScreenTemp.qml\nsingleton Ocr 1.0 Ocr.qml\nDummy 1.0 Dummy.qml\n',
+        'qmldir': 'module qs.services\nsingleton Audio 1.0 Audio.qml\nsingleton Bluez 1.0 Bluez.qml\nsingleton Brightness 1.0 Brightness.qml\nsingleton Hypr 1.0 Hypr.qml\nsingleton Screens 1.0 Screens.qml\nsingleton Weather 1.0 Weather.qml\nsingleton Nmcli 1.0 Nmcli.qml\nsingleton Notifs 1.0 Notifs.qml\nsingleton ScreenTemp 1.0 ScreenTemp.qml\nsingleton Ocr 1.0 Ocr.qml\nDummy 1.0 Dummy.qml\n',
         'Dummy.qml': 'import QtQuick\nItem {}\n',
+        'Brightness.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    component Monitor: QtObject {\n        property var modelData: null\n        property real brightness: 0.5\n    }\n    signal brightnessUpdated(real value)\n    property var monitors: []\n    function getMonitorForScreen(screen) {\n        return monitors.find(m => m.modelData === screen) || null;\n    }\n}\n',
         'Ocr.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property string ocrText: ""\n    property bool running: false\n    property string lastError: ""\n    function startOcr() {}\n}\n',
-        'Hypr.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    id: root\n    property int activeWsId: 1\n    property var toplevels: QtObject {\n        property var values: []\n    }\n    property var workspaces: QtObject {\n        property var values: []\n    }\n    property var monitors: QtObject {\n        property var values: []\n    }\n    signal dispatched(string request)\n    function dispatch(request) {\n        dispatched(request);\n        if (typeof Hyprland !== "undefined" && Hyprland) {\n            Hyprland.dispatch(request);\n        }\n    }\n}\n',
+        'Hypr.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    id: root\n    property int activeWsId: 1\n    property var focusedMonitor: null\n    property var toplevels: QtObject {\n        property var values: []\n    }\n    property var workspaces: QtObject {\n        property var values: []\n    }\n    property var monitors: QtObject {\n        property var values: []\n    }\n    function monitorFor(screen) {\n        if (!screen) return null;\n        return (monitors.values || []).find(m => m.name === screen.name) || null;\n    }\n    signal dispatched(string request)\n    function dispatch(request) {\n        dispatched(request);\n        if (typeof Hyprland !== "undefined" && Hyprland) {\n            Hyprland.dispatch(request);\n        }\n    }\n}\n',
         'Screens.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    id: root\n    property var screens: [\n        {\n            name: "DP-1",\n            x: 0,\n            y: 0,\n            width: 1920,\n            height: 1080\n        }\n    ]\n}\n',
         'Weather.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property string city: "Mock City"\n    property string temp: "20°C"\n    property string icon: "cloudy"\n    property string description: "Partly Cloudy"\n    signal fetchCoordsFromCity(string cityName)\n}\n',
         'Nmcli.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property bool wifiEnabled: true\n    property var active: QtObject { property string ssid: "Mock-Wifi" }\n    property var networks: []\n    signal enableWifi(bool checked)\n}\n',
         'Notifs.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property var list: []\n    property bool dnd: false\n    property string mutedAppsJson: "{}"\n    function isAppMuted(appName) { return false; }\n    function muteApp(appName, hours) {}\n    function unmuteApp(appName) {}\n}\n',
     },
     'qs/components': {
-        'qmldir': 'module qs.components\nStyledText 1.0 StyledText.qml\nStyledRect 1.0 StyledRect.qml\nDashboardState 1.0 DashboardState.qml\nSectionHeader 1.0 SectionHeader.qml\nMaterialIcon 1.0 MaterialIcon.qml\nAnim 1.0 Anim.qml\nStyledClippingRect 1.0 StyledClippingRect.qml\nDrawerVisibilities 1.0 DrawerVisibilities.qml\n',
+        'qmldir': 'module qs.components\nStyledText 1.0 StyledText.qml\nStyledRect 1.0 StyledRect.qml\nDashboardState 1.0 DashboardState.qml\nSectionHeader 1.0 SectionHeader.qml\nMaterialIcon 1.0 MaterialIcon.qml\nStateLayer 1.0 StateLayer.qml\nAnim 1.0 Anim.qml\nCAnim 1.0 CAnim.qml\nStyledClippingRect 1.0 StyledClippingRect.qml\nDrawerVisibilities 1.0 DrawerVisibilities.qml\n',
         'StyledText.qml': 'import QtQuick\nText {\n    property bool animate: false\n}\n',
         'StyledRect.qml': 'import QtQuick\nRectangle {\n    property color color: "transparent"\n}\n',
         'DashboardState.qml': 'import QtQuick\nQtObject {\n    property int currentTab: 0\n    property date currentDate: new Date()\n}\n',
         'SectionHeader.qml': 'import QtQuick\nItem {\n    property string title: ""\n}\n',
         'MaterialIcon.qml': 'import QtQuick\nText {\n    property string fontStyle: ""\n    property bool animate: false\n}\n',
+        'StateLayer.qml': 'import QtQuick\nItem {\n    signal clicked()\n    property real radius: 0\n    property bool disabled: false\n    property bool shapeMorph: false\n    property bool pressed: false\n    property bool containsMouse: false\n    property color color: "transparent"\n}\n',
         'Anim.qml': 'import QtQuick\nNumberAnimation {\n    enum Type {\n        StandardSmall = 0,\n        Standard,\n        StandardLarge,\n        StandardExtraLarge,\n        EmphasizedSmall,\n        Emphasized,\n        EmphasizedLarge,\n        EmphasizedExtraLarge,\n        FastSpatial,\n        DefaultSpatial,\n        SlowSpatial,\n        FastEffects,\n        DefaultEffects,\n        SlowEffects\n    }\n    property int type: Anim.DefaultSpatial\n}\n',
+        'CAnim.qml': 'import QtQuick\nColorAnimation {}\n',
         'StyledClippingRect.qml': 'import QtQuick\nItem {\n    property real radius: 0\n    property color color: "transparent"\n}\n',
         'DrawerVisibilities.qml': 'import QtQuick\nQtObject {\n    property bool bar: false\n    property bool osd: false\n    property bool session: false\n    property bool launcher: false\n    property bool dashboard: false\n    property bool utilities: false\n    property bool sidebar: false\n    property bool cheatsheet: false\n    property bool dashboardFocused: false\n}\n'
     },
     'qs/components/controls': {
-        'qmldir': 'module qs.components.controls\nStyledRadioButton 1.0 StyledRadioButton.qml\nStyledSlider 1.0 StyledSlider.qml\nIconTextButton 1.0 IconTextButton.qml\nCustomMouseArea 1.0 CustomMouseArea.qml\nIconButton 1.0 IconButton.qml\nButtonBase 1.0 ButtonBase.qml\nTextButton 1.0 TextButton.qml\nStyledScrollBar 1.0 StyledScrollBar.qml\nLoadingIndicator 1.0 LoadingIndicator.qml\nStyledInputField 1.0 StyledInputField.qml\nSwitchRow 1.0 SwitchRow.qml\nStyledSwitch 1.0 StyledSwitch.qml\nSplitButton 1.0 SplitButton.qml\nMenuItem 1.0 MenuItem.qml\nMenu 1.0 Menu.qml\n',
+        'qmldir': 'module qs.components.controls\nStyledRadioButton 1.0 StyledRadioButton.qml\nStyledSlider 1.0 StyledSlider.qml\nIconTextButton 1.0 IconTextButton.qml\nCustomMouseArea 1.0 CustomMouseArea.qml\nIconButton 1.0 IconButton.qml\nButtonBase 1.0 ButtonBase.qml\nTextButton 1.0 TextButton.qml\nStyledScrollBar 1.0 StyledScrollBar.qml\nLoadingIndicator 1.0 LoadingIndicator.qml\nCircularIndicator 1.0 CircularIndicator.qml\nStyledInputField 1.0 StyledInputField.qml\nSwitchRow 1.0 SwitchRow.qml\nStyledSwitch 1.0 StyledSwitch.qml\nSplitButton 1.0 SplitButton.qml\nMenuItem 1.0 MenuItem.qml\nMenu 1.0 Menu.qml\n',
         'StyledRadioButton.qml': 'import QtQuick\nimport QtQuick.Controls\nRadioButton {\n    property var modelData: null\n}\n',
         'StyledSlider.qml': 'import QtQuick\nimport QtQuick.Controls\nSlider {\n    signal interaction(real value)\n}\n',
         'IconTextButton.qml': 'import QtQuick\nItem {\n    property string icon: \"\"\n    property string text: \"\"\n    property var inactiveColour: null\n    property var inactiveOnColour: null\n    property var verticalPadding: null\n    property bool disabled: false\n    signal clicked()\n}\n',
@@ -115,6 +174,7 @@ mocks = {
         'TextButton.qml': 'import QtQuick\nimport qs.components.controls\nButtonBase {\n    property string text: \"\"\n    property int type: 0\n    signal clicked()\n}\n',
         'StyledScrollBar.qml': 'import QtQuick.Controls\nScrollBar {\n    property var flickable: null\n}',
         'LoadingIndicator.qml': 'import QtQuick\nItem {\n    property bool animated: false\n}',
+        'CircularIndicator.qml': 'import QtQuick\nItem {\n    enum AnimType {\n        Advance = 0,\n        Retreat\n    }\n    enum AnimState {\n        Stopped = 0,\n        Running,\n        Completing\n    }\n    property bool running: false\n    property real implicitSize: 24\n    property real strokeWidth: 4\n    property color fgColour: "#ffffff"\n    property color bgColour: "#000000"\n    property int type: CircularIndicator.Advance\n    property int animState: CircularIndicator.Stopped\n}',
         'StyledInputField.qml': 'import QtQuick\nItem {\n    property string text: \"\"\n    property string placeholderText: \"\"\n    signal editingFinished()\n    function clear() {\n        text = \"\"\n    }\n}',
         'SwitchRow.qml': 'import QtQuick\nimport QtQuick.Controls\nRow {\n    property string label: \"\"\n    property bool checked: false\n    signal toggled(bool checked)\n    Switch {\n        checked: parent.checked\n        onCheckedChanged: parent.toggled(checked)\n    }\n}',
         'StyledSwitch.qml': 'import QtQuick\nimport QtQuick.Controls\nSwitch {}',
@@ -124,7 +184,7 @@ mocks = {
     },
     'qs/components/effects': {
         'qmldir': 'module qs.components.effects\nStateLayer 1.0 StateLayer.qml\nColouriser 1.0 Colouriser.qml\nElevation 1.0 Elevation.qml\nColouredIcon 1.0 ColouredIcon.qml\nMask 1.0 Mask.qml\n',
-        'StateLayer.qml': 'import QtQuick\nItem {\n    signal clicked()\n    property bool disabled: false\n    property bool shapeMorph: false\n    property bool pressed: false\n    property bool containsMouse: false\n    property color color: "transparent"\n}\n',
+        'StateLayer.qml': 'import QtQuick\nItem {\n    signal clicked()\n    property real radius: 0\n    property bool disabled: false\n    property bool shapeMorph: false\n    property bool pressed: false\n    property bool containsMouse: false\n    property color color: "transparent"\n}\n',
         'Colouriser.qml': 'import QtQuick\nItem {\n    property color color: "transparent"\n    property var colorizationColor\n    property real brightness: 0\n}\n',
         'Elevation.qml': 'import QtQuick\nItem {\n    property int depth: 0\n    property int level: 0\n    property real radius: 0\n}\n',
         'ColouredIcon.qml': 'import QtQuick\nItem {\n    property var colour\n    property var name: ""\n    property var source: ""\n    property real implicitSize: 0\n}\n',
@@ -137,8 +197,10 @@ mocks = {
         'WrapperMouseArea.qml': 'import QtQuick\nMouseArea {}\n',
     },
     'Quickshell/Bluetooth': {
-        'qmldir': 'module Quickshell.Bluetooth\nDummyBt 1.0 DummyBt.qml\n',
+        'qmldir': 'module Quickshell.Bluetooth\nDummyBt 1.0 DummyBt.qml\nBluetoothDeviceState 1.0 BluetoothDeviceState.qml\nBluetoothAdapterState 1.0 BluetoothAdapterState.qml\n',
         'DummyBt.qml': 'import QtQuick\nItem {}\n',
+        'BluetoothDeviceState.qml': 'import QtQuick\nQtObject {\n    enum State {\n        Disconnected = 0,\n        Connected = 1,\n        Connecting = 2,\n        Disconnecting = 3\n    }\n}\n',
+        'BluetoothAdapterState.qml': 'import QtQuick\nQtObject {\n    enum State {\n        Disabled = 0,\n        Enabled = 1,\n        Enabling = 2,\n        Disabling = 3,\n        Blocked = 4\n    }\n}\n',
     },
     'qs/components/containers': {
         'qmldir': 'module qs.components.containers\nStyledWindow 1.0 StyledWindow.qml\nStyledFlickable 1.0 StyledFlickable.qml\nWindowAnchors 1.0 WindowAnchors.qml\nStyledListView 1.0 StyledListView.qml\n',
@@ -167,7 +229,9 @@ mocks = {
         'WlrKeyboardFocus.qml': 'import QtQuick\npragma Singleton\nQtObject {\n    enum Type {\n        Exclusive = 0\n    }\n}\n',
     },
     'Quickshell/Hyprland': {
-        'qmldir': 'module Quickshell.Hyprland\n',
+        'qmldir': 'module Quickshell.Hyprland\nHyprlandFocusGrab 1.0 HyprlandFocusGrab.qml\nHyprlandMonitor 1.0 HyprlandMonitor.qml\n',
+        'HyprlandFocusGrab.qml': 'import QtQuick\nQtObject {\n    property var windows: []\n    property bool active: false\n    signal cleared()\n}\n',
+        'HyprlandMonitor.qml': 'import QtQuick\nQtObject {\n    property string name: ""\n    property bool focused: false\n    property var lastIpcObject: ({})\n    property var activeWorkspace: null\n}\n',
     },
     'Caelestia/Internal': {
         'qmldir': 'module Caelestia.Internal\n',
@@ -183,9 +247,11 @@ for mod, files in mocks.items():
     for fname, content in files.items():
         (d / fname).write_text(content)
 
-# Copy the real Audio.qml and ScreenTemp.qml to qs/services/
+# Copy the real Audio.qml, Bluez.qml, ScreenTemp.qml, and Notifs.qml to qs/services/
 shutil.copy(REPO_ROOT / "services/Audio.qml", base_import_path / "qs/services/Audio.qml")
+shutil.copy(REPO_ROOT / "services/Bluez.qml", base_import_path / "qs/services/Bluez.qml")
 shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
+shutil.copy(REPO_ROOT / "services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
 
 # Mock Pipewire and QML Classes
 class MockPwAudio(QObject):
@@ -536,31 +602,326 @@ class MockButtonRow(QQuickItem):
 
 class MockBluetoothAdapter(QObject):
     enabledChanged = Signal(bool)
+    discoveringChanged = Signal(bool)
+    pairableChanged = Signal(bool)
+    discoverableChanged = Signal(bool)
+    stateChanged = Signal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._enabled = True
+        self._discovering = False
+        self._pairable = False
+        self._discoverable = False
+        self._state = 1  # Enabled
+        self._adapterId = "hci0"
+
     def get_enabled(self): return self._enabled
     def set_enabled(self, val):
-        self._enabled = val
-        self.enabledChanged.emit(val)
+        if self._enabled != bool(val):
+            self._enabled = bool(val)
+            self._state = 1 if self._enabled else 0
+            self.enabledChanged.emit(self._enabled)
+            self.stateChanged.emit(self._state)
+
+    def get_discovering(self): return self._discovering
+    def set_discovering(self, val):
+        if self._discovering != bool(val):
+            self._discovering = bool(val)
+            self.discoveringChanged.emit(self._discovering)
+
+    def get_pairable(self): return self._pairable
+    def set_pairable(self, val):
+        if self._pairable != bool(val):
+            self._pairable = bool(val)
+            self.pairableChanged.emit(self._pairable)
+
+    def get_discoverable(self): return self._discoverable
+    def set_discoverable(self, val):
+        if self._discoverable != bool(val):
+            self._discoverable = bool(val)
+            self.discoverableChanged.emit(self._discoverable)
+
+    def get_state(self): return self._state
+    def set_state(self, val):
+        if self._state != int(val):
+            self._state = int(val)
+            self.stateChanged.emit(self._state)
+
     enabled = Property(bool, get_enabled, set_enabled, notify=enabledChanged)
+    discovering = Property(bool, get_discovering, set_discovering, notify=discoveringChanged)
+    pairable = Property(bool, get_pairable, set_pairable, notify=pairableChanged)
+    discoverable = Property(bool, get_discoverable, set_discoverable, notify=discoverableChanged)
+    state = Property(int, get_state, set_state, notify=stateChanged)
+    adapterId = Property(str, lambda self: self._adapterId, constant=True)
+
+
+class MockBluetoothDevice(QObject):
+    connectedChanged = Signal(bool)
+    pairingChanged = Signal(bool)
+    pairedChanged = Signal(bool)
+    bondedChanged = Signal(bool)
+    trustedChanged = Signal(bool)
+    blockedChanged = Signal(bool)
+    stateChanged = Signal(int)
+    batteryChanged = Signal(float)
+    batteryAvailableChanged = Signal(bool)
+
+    def __init__(self, address="AA:BB:CC:DD:EE:FF", name="Mock BT", icon="audio-headset",
+                 connected=False, paired=True, bonded=True, trusted=True, blocked=False,
+                 battery=0.8, batteryAvailable=True, parent=None):
+        super().__init__(parent)
+        self._address = address
+        self._name = name
+        self._deviceName = name
+        self._icon = icon
+        self._connected = connected
+        self._pairing = False
+        self._paired = paired
+        self._bonded = bonded
+        self._trusted = trusted
+        self._blocked = blocked
+        self._state = 1 if connected else 0
+        self._battery = battery
+        self._batteryAvailable = batteryAvailable
+        self.calls = []
+
+    address = Property(str, lambda self: self._address, constant=True)
+    name = Property(str, lambda self: self._name, constant=True)
+    deviceName = Property(str, lambda self: self._deviceName, constant=True)
+    icon = Property(str, lambda self: self._icon, constant=True)
+
+    @Property(bool, notify=connectedChanged)
+    def connected(self): return self._connected
+    @connected.setter
+    def connected(self, val):
+        if self._connected != bool(val):
+            self._connected = bool(val)
+            self.connectedChanged.emit(self._connected)
+
+    @Property(bool, notify=pairingChanged)
+    def pairing(self): return self._pairing
+    @pairing.setter
+    def pairing(self, val):
+        if self._pairing != bool(val):
+            self._pairing = bool(val)
+            self.pairingChanged.emit(self._pairing)
+
+    @Property(bool, notify=pairedChanged)
+    def paired(self): return self._paired
+    @paired.setter
+    def paired(self, val):
+        if self._paired != bool(val):
+            self._paired = bool(val)
+            self.pairedChanged.emit(self._paired)
+
+    @Property(bool, notify=bondedChanged)
+    def bonded(self): return self._bonded
+    @bonded.setter
+    def bonded(self, val):
+        if self._bonded != bool(val):
+            self._bonded = bool(val)
+            self.bondedChanged.emit(self._bonded)
+
+    @Property(bool, notify=trustedChanged)
+    def trusted(self): return self._trusted
+    @trusted.setter
+    def trusted(self, val):
+        if self._trusted != bool(val):
+            self._trusted = bool(val)
+            self.trustedChanged.emit(self._trusted)
+
+    @Property(bool, notify=blockedChanged)
+    def blocked(self): return self._blocked
+    @blocked.setter
+    def blocked(self, val):
+        if self._blocked != bool(val):
+            self._blocked = bool(val)
+            self.blockedChanged.emit(self._blocked)
+
+    @Property(int, notify=stateChanged)
+    def state(self): return self._state
+    @state.setter
+    def state(self, val):
+        if self._state != int(val):
+            self._state = int(val)
+            self.stateChanged.emit(self._state)
+
+    @Property(float, notify=batteryChanged)
+    def battery(self): return self._battery
+
+    @Property(bool, notify=batteryAvailableChanged)
+    def batteryAvailable(self): return self._batteryAvailable
+
+    @Slot()
+    def connect(self):
+        self.calls.append("connect")
+        self._state = 1
+        self._connected = True
+        self.stateChanged.emit(1)
+        self.connectedChanged.emit(True)
+
+    @Slot()
+    def disconnect(self):
+        self.calls.append("disconnect")
+        self._state = 0
+        self._connected = False
+        self.stateChanged.emit(0)
+        self.connectedChanged.emit(False)
+
+    @Slot()
+    def pair(self):
+        self.calls.append("pair")
+        self._paired = True
+        self._bonded = True
+        self.pairedChanged.emit(True)
+        self.bondedChanged.emit(True)
+
+    @Slot()
+    def forget(self):
+        self.calls.append("forget")
+        self._paired = False
+        self._bonded = False
+        self._connected = False
+        self.pairedChanged.emit(False)
+        self.bondedChanged.emit(False)
+        self.connectedChanged.emit(False)
+
+
+class MockBluetoothAdapters(QObject):
+    valuesChanged = Signal()
+    def __init__(self, adapter=None, parent=None):
+        super().__init__(parent)
+        self._values = [adapter] if adapter is not None else []
+    def set_values(self, vals):
+        self._values = list(vals)
+        self.valuesChanged.emit()
+    values = Property('QVariantList', lambda self: self._values, notify=valuesChanged)
+
 
 class MockBluetoothDevices(QObject):
     valuesChanged = Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self._values = []
+    def set_values(self, vals):
+        self._values = list(vals)
+        self.valuesChanged.emit()
     values = Property('QVariantList', lambda self: self._values, notify=valuesChanged)
+
 
 class MockBluetooth(QObject):
     defaultAdapterChanged = Signal()
     devicesChanged = Signal()
+    adaptersChanged = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._adapter = MockBluetoothAdapter(self)
+        self._adapters = MockBluetoothAdapters(self._adapter, self)
         self._devices = MockBluetoothDevices(self)
+
+    def reset(self):
+        self._adapter = MockBluetoothAdapter(self)
+        self._adapters.set_values([self._adapter])
+        self._devices.set_values([])
+        self.defaultAdapterChanged.emit()
+
     defaultAdapter = Property(QObject, lambda self: self._adapter, notify=defaultAdapterChanged)
+    adapters = Property(QObject, lambda self: self._adapters, notify=adaptersChanged)
     devices = Property(QObject, lambda self: self._devices, notify=devicesChanged)
+
+
+class MockBluezAgent(QObject):
+    registeredChanged = Signal()
+    pendingRequestChanged = Signal()
+    enteredChanged = Signal()
+    requestReceived = Signal(str, str, str)
+    requestCleared = Signal(str)
+    registrationFailed = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._registered = True
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self._deviceAddress = ""
+        self._deviceName = ""
+        self._passkey = ""
+        self._entered = 0
+        self._serviceUuid = ""
+        self.responses = []
+
+    def reset(self):
+        self._registered = True
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self._deviceAddress = ""
+        self._deviceName = ""
+        self._passkey = ""
+        self._entered = 0
+        self._serviceUuid = ""
+        self.responses.clear()
+        self.pendingRequestChanged.emit()
+
+    registered = Property(bool, lambda self: self._registered, notify=registeredChanged)
+    hasPendingRequest = Property(bool, lambda self: self._hasPendingRequest, notify=pendingRequestChanged)
+    needsReply = Property(bool, lambda self: self._needsReply, notify=pendingRequestChanged)
+    requestType = Property(str, lambda self: self._requestType, notify=pendingRequestChanged)
+    deviceAddress = Property(str, lambda self: self._deviceAddress, notify=pendingRequestChanged)
+    deviceName = Property(str, lambda self: self._deviceName, notify=pendingRequestChanged)
+    passkey = Property(str, lambda self: self._passkey, notify=pendingRequestChanged)
+    entered = Property(int, lambda self: self._entered, notify=enteredChanged)
+    serviceUuid = Property(str, lambda self: self._serviceUuid, notify=pendingRequestChanged)
+
+    def trigger_request(self, req_type, address, name="", passkey="", service_uuid="", needs_reply=True):
+        self._requestType = req_type
+        self._deviceAddress = address
+        self._deviceName = name
+        self._passkey = passkey
+        self._serviceUuid = service_uuid
+        self._hasPendingRequest = True
+        self._needsReply = needs_reply
+        self.pendingRequestChanged.emit()
+        self.requestReceived.emit(req_type, address, passkey)
+
+    @Slot(bool)
+    def respondConfirmation(self, accept):
+        self.responses.append(("confirm", bool(accept)))
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self.pendingRequestChanged.emit()
+        self.requestCleared.emit("responded")
+
+    @Slot(str)
+    def respondPin(self, pin):
+        self.responses.append(("pin", str(pin)))
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self.pendingRequestChanged.emit()
+        self.requestCleared.emit("responded")
+
+    @Slot(int)
+    def respondPasskey(self, passkeyValue):
+        self.responses.append(("passkey", int(passkeyValue)))
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self.pendingRequestChanged.emit()
+        self.requestCleared.emit("responded")
+
+    @Slot()
+    def cancelPending(self):
+        self.responses.append(("cancel", None))
+        self._hasPendingRequest = False
+        self._needsReply = False
+        self._requestType = ""
+        self.pendingRequestChanged.emit()
+        self.requestCleared.emit("cancelled")
 
 class MockUrgency(QObject):
     def __init__(self, parent=None):
@@ -829,6 +1190,8 @@ class MockProcess(QObject):
     stdoutChanged = Signal(QObject)
     stderrChanged = Signal(QObject)
     stdinChanged = Signal(QObject)
+    exitCodeChanged = Signal(int)
+    exited = Signal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -837,29 +1200,55 @@ class MockProcess(QObject):
         self._stdout = None
         self._stderr = None
         self._stdin = None
+        self._exitCode = 0
+        self._proc = None
 
     def get_running(self):
         return self._running
 
     def set_running(self, val):
-        print(f"DEBUG MockProcess set_running: val={val}, current_running={self._running}, command={self._command}")
         if self._running != val:
             self._running = val
             self.runningChanged.emit(val)
             if val:
                 import subprocess
                 try:
-                    self._proc = subprocess.Popen([str(x) for x in self._command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    self._proc = subprocess.Popen(
+                        [str(x) for x in self._command],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
                     try:
-                        self._proc.communicate(timeout=1.0)
-                    except Exception:
+                        out_b, err_b = self._proc.communicate(timeout=0.35)
+                        rc = self._proc.returncode
+                        self._exitCode = rc
+                        self.exitCodeChanged.emit(rc)
+                        if self._stdout is not None:
+                            self._stdout.setProperty("text", out_b.decode("utf-8", errors="replace"))
+                            if hasattr(self._stdout, "streamFinished"):
+                                self._stdout.streamFinished.emit()
+                        if self._stderr is not None:
+                            self._stderr.setProperty("text", err_b.decode("utf-8", errors="replace"))
+                            if hasattr(self._stderr, "streamFinished"):
+                                self._stderr.streamFinished.emit()
+                        self._running = False
+                        self.runningChanged.emit(False)
+                        self.exited.emit(rc, 0)
+                    except subprocess.TimeoutExpired:
+                        # Long-running processes (e.g. wlsunset) intentionally stay running until stopped
                         pass
                 except Exception as e:
                     print("MockProcess error running command:", self._command, e)
+                    self._exitCode = 1
+                    self.exitCodeChanged.emit(1)
+                    self._running = False
+                    self.runningChanged.emit(False)
+                    self.exited.emit(1, 0)
             else:
-                if hasattr(self, '_proc') and self._proc:
+                if getattr(self, "_proc", None):
                     try:
                         self._proc.kill()
+                        self._proc.wait(timeout=0.2)
                     except Exception:
                         pass
                     self._proc = None
@@ -876,20 +1265,23 @@ class MockProcess(QObject):
     stdout = Property(QObject, lambda self: self._stdout, lambda self, val: setattr(self, '_stdout', val), notify=stdoutChanged)
     stderr = Property(QObject, lambda self: self._stderr, lambda self, val: setattr(self, '_stderr', val), notify=stderrChanged)
     stdin = Property(QObject, lambda self: self._stdin, lambda self, val: setattr(self, '_stdin', val), notify=stdinChanged)
+    exitCode = Property(int, lambda self: self._exitCode, notify=exitCodeChanged)
 
 
 class MockToast(QObject):
     closedChanged = Signal()
-    def __init__(self, t, m, i):
+    def __init__(self, t, m, i, toast_type=0):
         super().__init__()
         self._title = t
         self._message = m
         self._icon = i
+        self._type = int(toast_type)
         self._closed = False
     
     title = Property(str, lambda self: self._title, constant=True)
     message = Property(str, lambda self: self._message, constant=True)
     icon = Property(str, lambda self: self._icon, constant=True)
+    type = Property(int, lambda self: self._type, constant=True)
     closed = Property(bool, lambda self: self._closed, notify=closedChanged)
     
     @Slot()
@@ -904,14 +1296,17 @@ class MockToast(QObject):
             return self._message
         elif idx == 2:
             return self._icon
+        elif idx == 3:
+            return self._type
         raise IndexError
 
 class MockToaster(QObject):
     toastsChanged = Signal()
     
     @Slot(str, str, str)
-    def toast(self, title, message, icon):
-        self._toasts.append(MockToast(title, message, icon))
+    @Slot(str, str, str, int)
+    def toast(self, title, message, icon, toast_type=0):
+        self._toasts.append(MockToast(title, message, icon, toast_type))
         self.toastsChanged.emit()
 
     def __init__(self, parent=None):
@@ -1177,7 +1572,61 @@ class WlrLayershell(QObject):
     def qmlAttachedProperties(cls, target):
         return WlrLayershellAttached(target)
 
+class MockConfigState:
+    osd = {
+        "enabled": True,
+        "hideDelay": 1500,
+        "enableMicrophone": False,
+        "enableBrightness": True,
+    }
+    utilities = {
+        "enabled": True,
+        "maxToasts": 4,
+        "toasts": {
+            "audioOutputChanged": True,
+            "audioInputChanged": True,
+            "kbLayoutChanged": True,
+            "configLoaded": False,
+            "fullscreen": "important",
+        },
+    }
+    bar = {"popouts": {"activeIndicator": False}}
+    services = {"maxVolume": 1.0, "audioIncrement": 0.05, "visualiserBars": 20}
+    session = {"enabled": True}
+
+class MockConfigAttached(QObject):
+    osdChanged = Signal()
+    utilitiesChanged = Signal()
+    barChanged = Signal()
+    servicesChanged = Signal()
+    sessionChanged = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    @Property('QVariantMap', notify=osdChanged)
+    def osd(self): return dict(MockConfigState.osd)
+
+    @Property('QVariantMap', notify=utilitiesChanged)
+    def utilities(self): return dict(MockConfigState.utilities)
+
+    @Property('QVariantMap', notify=barChanged)
+    def bar(self): return dict(MockConfigState.bar)
+
+    @Property('QVariantMap', notify=servicesChanged)
+    def services(self): return dict(MockConfigState.services)
+
+    @Property('QVariantMap', notify=sessionChanged)
+    def session(self): return dict(MockConfigState.session)
+
+@QmlAttached(MockConfigAttached)
+class MockConfigElement(QObject):
+    @staticmethod
+    def qmlAttachedProperties(cls, target):
+        return MockConfigAttached(target)
+
 qmlRegisterType(WlrLayershell, "Quickshell.Wayland", 1, 0, "WlrLayershell")
+qmlRegisterType(MockConfigElement, "Caelestia.Config", 1, 0, "Config")
 
 qmlRegisterType(MockProcess, "Quickshell.Io", 1, 0, "Process")
 qmlRegisterType(MockPwNode, "Quickshell.Services.Pipewire", 1, 0, "PwNode")
@@ -1198,9 +1647,43 @@ qmlRegisterType(MockNotifData, "Quickshell.Services.Notifications", 1, 0, "Notif
 qmlRegisterType(MockNotifData, "Caelestia", 1, 0, "NotifData")
 qmlRegisterType(MockNotifData, "qs.services", 1, 0, "NotifData")
 
-mock_bt = MockBluetooth()
-qmlRegisterSingletonInstance(MockBluetooth, "Quickshell.Bluetooth", 1, 0, "Bluetooth", mock_bt)
-qmlRegisterSingletonInstance(MockUrgency, "Quickshell.Services.Notifications", 1, 0, "NotificationUrgency", mock_urgency)
+_bt_instances = {}
+_agent_instances = {}
+_urgency_instances = {}
+
+
+def _bt_singleton_provider(engine):
+    eid = id(engine)
+    if eid not in _bt_instances:
+        inst = MockBluetooth()
+        QQmlEngine.setObjectOwnership(inst, QQmlEngine.CppOwnership)
+        _bt_instances[eid] = inst
+    return _bt_instances[eid]
+
+
+def _agent_singleton_provider(engine):
+    eid = id(engine)
+    if eid not in _agent_instances:
+        inst = MockBluezAgent()
+        QQmlEngine.setObjectOwnership(inst, QQmlEngine.CppOwnership)
+        _agent_instances[eid] = inst
+    return _agent_instances[eid]
+
+
+def _urgency_singleton_provider(engine):
+    eid = id(engine)
+    if eid not in _urgency_instances:
+        inst = MockUrgency()
+        QQmlEngine.setObjectOwnership(inst, QQmlEngine.CppOwnership)
+        _urgency_instances[eid] = inst
+    return _urgency_instances[eid]
+
+
+qmlRegisterType(MockBluetoothDevice, "Quickshell.Bluetooth", 1, 0, "BluetoothDevice")
+qmlRegisterType(MockBluetoothAdapter, "Quickshell.Bluetooth", 1, 0, "BluetoothAdapter")
+qmlRegisterSingletonType(MockBluetooth, "Quickshell.Bluetooth", 1, 0, "Bluetooth", _bt_singleton_provider)
+qmlRegisterSingletonType(MockBluezAgent, "Caelestia.Services", 1, 0, "BluezAgent", _agent_singleton_provider)
+qmlRegisterSingletonType(MockUrgency, "Quickshell.Services.Notifications", 1, 0, "NotificationUrgency", _urgency_singleton_provider)
 
 @pytest.fixture(scope="session")
 def qapp():
@@ -1220,8 +1703,9 @@ def qapp():
     for f in polluted_files:
         (services_dir / f).unlink(missing_ok=True)
 
-    # Copy Audio.qml and ScreenTemp.qml to isolated services path
+    # Copy Audio.qml, Bluez.qml, ScreenTemp.qml, and Notifs.qml to isolated services path
     shutil.copy(REPO_ROOT / "services/Audio.qml", base_import_path / "qs/services/Audio.qml")
+    shutil.copy(REPO_ROOT / "services/Bluez.qml", base_import_path / "qs/services/Bluez.qml")
     shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
     shutil.copy(REPO_ROOT / "services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
 
@@ -1251,7 +1735,48 @@ def mock_toaster():
 
 
 @pytest.fixture
+def mock_bluetooth(qml_engine):
+    inst = _bt_singleton_provider(qml_engine)
+    inst.reset()
+    return inst
+
+
+@pytest.fixture
+def mock_agent(qml_engine):
+    inst = _agent_singleton_provider(qml_engine)
+    inst.reset()
+    return inst
+
+
+@pytest.fixture
+def pactl_state(tmp_path, monkeypatch):
+    state_file = tmp_path / "pactl_state.json"
+    log_file = tmp_path / "pactl_calls.log"
+    state_file.write_text("{}")
+    monkeypatch.setenv("CAELESTIA_TEST_PACTL_STATE", str(state_file))
+    monkeypatch.setenv("CAELESTIA_TEST_PACTL_LOG", str(log_file))
+    return state_file, log_file
+
+
+@pytest.fixture
 def qml_engine(qapp, mock_pipewire, mock_toaster):
+    MockConfigState.osd = {
+        "enabled": True,
+        "hideDelay": 1500,
+        "enableMicrophone": False,
+        "enableBrightness": True,
+    }
+    MockConfigState.utilities = {
+        "enabled": True,
+        "maxToasts": 4,
+        "toasts": {
+            "audioOutputChanged": True,
+            "audioInputChanged": True,
+            "kbLayoutChanged": True,
+            "configLoaded": False,
+            "fullscreen": "important",
+        },
+    }
     try:
         import sys
         # Clear global_quickshell_instances to handle engine id reuse
@@ -1269,9 +1794,15 @@ def qml_engine(qapp, mock_pipewire, mock_toaster):
         print("DEBUG: ALL FILES IN base_import_path:")
         for p in base_import_path.glob("**/*"):
             print("  -", p)
+    _bt_instances.clear()
+    _agent_instances.clear()
+    _urgency_instances.clear()
     engine = QQmlEngine()
     engine.clearComponentCache()
     engine.addImportPath(str(base_import_path))
+    _bt_singleton_provider(engine)
+    _agent_singleton_provider(engine)
+    _urgency_singleton_provider(engine)
     
     # Expose context properties
     engine.rootContext().setContextProperty("Pipewire", mock_pipewire)
@@ -1297,7 +1828,10 @@ def qml_engine(qapp, mock_pipewire, mock_toaster):
         raise RuntimeError(f"Failed to create Colours mock: {comp_colours.errors()}")
     engine.rootContext().setContextProperty("Colours", colours)
     
-    return engine
+    yield engine
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QCoreApplication.processEvents()
 
 
 @pytest.fixture

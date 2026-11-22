@@ -20,8 +20,16 @@ Item {
     property string activeBtDeviceName: qsTr("Select Bluetooth...")
 
     function updateConnectedDeviceName() {
-        const connectedDevice = [...Bluetooth.devices.values].find(d => d.connected);
-        activeBtDeviceName = connectedDevice ? connectedDevice.name : qsTr("Select Bluetooth...");
+        if (!Bluez.hasAdapter) {
+            activeBtDeviceName = qsTr("No Bluetooth adapter");
+            return;
+        }
+        if (Bluez.hardBlocked) {
+            activeBtDeviceName = qsTr("Bluetooth hardware blocked");
+            return;
+        }
+        const connectedDevice = [...(Bluetooth.devices?.values ?? [])].find(d => d.connected);
+        activeBtDeviceName = connectedDevice ? (connectedDevice.name || connectedDevice.address) : qsTr("Select Bluetooth...");
     }
 
     anchors.fill: parent
@@ -29,6 +37,18 @@ Item {
 
     Component.onCompleted: {
         updateConnectedDeviceName();
+    }
+
+    Connections {
+        target: Bluez
+
+        function onHasAdapterChanged() {
+            root.updateConnectedDeviceName();
+        }
+
+        function onHardBlockedChanged() {
+            root.updateConnectedDeviceName();
+        }
     }
 
     Connections {
@@ -40,7 +60,7 @@ Item {
     }
 
     Repeater {
-        model: Bluetooth.devices?.values ?? []
+        model: [...(Bluetooth.devices?.values ?? [])].filter(d => d.bonded || d.paired || d.connected) // qmllint disable unresolved-type
 
         delegate: Connections {
             function onConnectedChanged() {
@@ -189,6 +209,8 @@ Item {
                 SwitchRow {
                     label: qsTr("Bluetooth")
                     checked: Bluez.enabled
+                    enabled: Bluez.hasAdapter && !Bluez.hardBlocked
+                    opacity: enabled ? 1 : 0.38
                     onToggled: checked => Bluez.setEnabled(checked)
                 }
 
@@ -202,8 +224,10 @@ Item {
                     implicitHeight: btDropdownRow.implicitHeight + Tokens.padding.medium * 2
                     radius: Tokens.rounding.medium
                     color: Colours.layer(Colours.palette.m3surfaceContainer, 1)
+                    opacity: Bluez.hasAdapter && !Bluez.hardBlocked ? 1 : 0.38
 
                     StateLayer {
+                        disabled: !Bluez.hasAdapter || Bluez.hardBlocked
                         onClicked: btDropdownBtn.expanded = !btDropdownBtn.expanded
                     }
 
@@ -235,24 +259,35 @@ Item {
                 // Expanded Bluetooth device list
                 ColumnLayout {
                     Layout.fillWidth: true
-                    visible: btDropdownBtn.expanded
+                    visible: btDropdownBtn.expanded && Bluez.hasAdapter && !Bluez.hardBlocked
                     spacing: Tokens.spacing.extraSmall
 
                     Repeater {
                         model: ScriptModel {
-                            values: [...Bluetooth.devices.values].filter(d => d.bonded)
+                            values: [...(Bluetooth.devices?.values ?? [])] // qmllint disable unresolved-type
+                                .filter(d => d.bonded || d.paired || d.connected)
+                                .sort((a, b) => (b.connected - a.connected) || (a.name || a.address || "").localeCompare(b.name || b.address || ""))
                         }
 
                         delegate: StyledRect {
-                            required property var modelData
+                            id: btItem
+
+                            required property BluetoothDevice modelData // qmllint disable unresolved-type
+                            readonly property bool isConnected: modelData.connected || modelData.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
+                            readonly property bool loading: modelData.pairing
+                                || modelData.state === BluetoothDeviceState.Connecting // qmllint disable unresolved-type
+                                || modelData.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+                                || (Bluez.enabling && (Bluez.pendingConnectDevice === modelData || Bluez.pendingPairDevice === modelData))
 
                             Layout.fillWidth: true
                             implicitHeight: btItemRow.implicitHeight + Tokens.padding.small * 2
                             radius: Tokens.rounding.small
-                            color: modelData.connected ? Colours.palette.m3primaryContainer : Colours.layer(Colours.palette.m3surfaceContainer, 1)
+                            color: btItem.isConnected ? Colours.palette.m3primaryContainer : Colours.layer(Colours.palette.m3surfaceContainer, 1)
+                            opacity: modelData.blocked ? 0.45 : 1
 
                             StateLayer {
-                                onClicked: Bluez.toggleDeviceConnection(modelData)
+                                disabled: btItem.loading || btItem.modelData.blocked
+                                onClicked: Bluez.toggleDeviceConnection(btItem.modelData)
                             }
 
                             RowLayout {
@@ -265,22 +300,29 @@ Item {
                                 spacing: Tokens.spacing.small
 
                                 MaterialIcon {
-                                    text: Icons.getBluetoothIcon(modelData.icon)
-                                    color: modelData.connected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
+                                    text: Icons.getBluetoothIcon(btItem.modelData.icon)
+                                    color: btItem.isConnected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
                                 }
 
                                 StyledText {
                                     Layout.fillWidth: true
-                                    text: modelData.name || qsTr("Unknown Device")
-                                    color: modelData.connected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
+                                    text: (btItem.modelData.name || btItem.modelData.address || qsTr("Unknown Device")) + (btItem.modelData.paired && !btItem.modelData.bonded ? qsTr(" (Temp)") : "")
+                                    color: btItem.isConnected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurface
                                     font: Tokens.font.body.small
                                     elide: Text.ElideRight
                                 }
 
+                                CircularIndicator {
+                                    visible: btItem.loading
+                                    running: btItem.loading
+                                    implicitSize: 16
+                                    strokeWidth: 2
+                                }
+
                                 MaterialIcon {
-                                    visible: modelData.connected && modelData.batteryAvailable
-                                    text: Icons.getBatteryIcon(modelData.battery)
-                                    color: modelData.connected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
+                                    visible: !btItem.loading && btItem.isConnected && btItem.modelData.batteryAvailable
+                                    text: Icons.getBatteryIcon(btItem.modelData.battery)
+                                    color: btItem.isConnected ? Colours.palette.m3onPrimaryContainer : Colours.palette.m3onSurfaceVariant
                                     fontStyle: Tokens.font.icon.small
                                 }
                             }

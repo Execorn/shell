@@ -3,6 +3,8 @@
 #include "service.hpp"
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
+#include <cstddef>
 #include <mutex>
 #include <pipewire/pipewire.h>
 #include <qloggingcategory.h>
@@ -22,8 +24,10 @@ PipeWireWorker::PipeWireWorker(std::stop_token token, AudioCollector* collector)
     : m_loop(nullptr)
     , m_stream(nullptr)
     , m_timer(nullptr)
+    , m_wakeup(nullptr)
     , m_idle(true)
-    , m_token(token)
+    , m_wasConnected(false)
+    , m_token(std::move(token))
     , m_collector(collector) {
     pw_init(nullptr, nullptr);
 
@@ -34,15 +38,31 @@ PipeWireWorker::PipeWireWorker(std::stop_token token, AudioCollector* collector)
         return;
     }
 
-    timespec timeout = { 0, 10 * SPA_NSEC_PER_MSEC };
-    m_timer = pw_loop_add_timer(pw_main_loop_get_loop(m_loop), handleTimeout, this);
-    if (!m_timer) {
-        qCWarning(lcAcWorker) << "init: failed to create timer";
-        pw_main_loop_destroy(m_loop);
-        pw_deinit();
+    pw_loop* const loop = pw_main_loop_get_loop(m_loop);
+
+    m_wakeup = pw_loop_add_event(
+        loop,
+        [](void* data, uint64_t) {
+            auto* self = static_cast<PipeWireWorker*>(data);
+            if (self->m_token.stop_requested()) {
+                pw_main_loop_quit(self->m_loop);
+            }
+        },
+        this);
+    if (!m_wakeup) {
+        qCWarning(lcAcWorker) << "init: failed to create wakeup event";
+        cleanup();
         return;
     }
-    pw_loop_update_timer(pw_main_loop_get_loop(m_loop), m_timer, &timeout, &timeout, false);
+
+    timespec timeout = { 0, 10 * SPA_NSEC_PER_MSEC };
+    m_timer = pw_loop_add_timer(loop, handleTimeout, this);
+    if (!m_timer) {
+        qCWarning(lcAcWorker) << "init: failed to create timer";
+        cleanup();
+        return;
+    }
+    pw_loop_update_timer(loop, m_timer, &timeout, &timeout, false);
 
     auto props = pw_properties_new(
         PW_KEY_MEDIA_TYPE, "Audio", PW_KEY_MEDIA_CATEGORY, "Capture", PW_KEY_MEDIA_ROLE, "Music", nullptr);
@@ -75,11 +95,10 @@ PipeWireWorker::PipeWireWorker(std::stop_token token, AudioCollector* collector)
         self->processStream();
     };
 
-    m_stream = pw_stream_new_simple(pw_main_loop_get_loop(m_loop), "caelestia-shell", props, &events, this);
+    m_stream = pw_stream_new_simple(loop, "caelestia-shell", props, &events, this);
     if (!m_stream) {
         qCWarning(lcAcWorker) << "init: failed to create stream";
-        pw_main_loop_destroy(m_loop);
-        pw_deinit();
+        cleanup();
         return;
     }
 
@@ -89,16 +108,40 @@ PipeWireWorker::PipeWireWorker(std::stop_token token, AudioCollector* collector)
         params, 1);
     if (success < 0) {
         qCWarning(lcAcWorker) << "init: failed to connect stream";
-        pw_stream_destroy(m_stream);
-        pw_main_loop_destroy(m_loop);
-        pw_deinit();
+        cleanup();
         return;
     }
 
-    pw_main_loop_run(m_loop);
+    {
+        std::stop_callback stopCb(m_token, [this, loop]() {
+            pw_loop_signal_event(loop, m_wakeup);
+        });
+        if (!m_token.stop_requested()) {
+            pw_main_loop_run(m_loop);
+        }
+    }
 
-    pw_stream_destroy(m_stream);
-    pw_main_loop_destroy(m_loop);
+    cleanup();
+}
+
+void PipeWireWorker::cleanup() {
+    if (m_stream) {
+        pw_stream_destroy(m_stream);
+        m_stream = nullptr;
+    }
+    if (m_loop) {
+        pw_loop* const loop = pw_main_loop_get_loop(m_loop);
+        if (m_timer) {
+            pw_loop_destroy_source(loop, m_timer);
+            m_timer = nullptr;
+        }
+        if (m_wakeup) {
+            pw_loop_destroy_source(loop, m_wakeup);
+            m_wakeup = nullptr;
+        }
+        pw_main_loop_destroy(m_loop);
+        m_loop = nullptr;
+    }
     pw_deinit();
 }
 
@@ -124,18 +167,26 @@ void PipeWireWorker::handleTimeout(void* data, uint64_t expirations) {
 void PipeWireWorker::streamStateChanged(pw_stream_state state) {
     m_idle = false;
     switch (state) {
+    case PW_STREAM_STATE_CONNECTING:
+        m_wasConnected = true;
+        break;
     case PW_STREAM_STATE_PAUSED: {
+        m_wasConnected = true;
         timespec timeout = { 0, 10 * SPA_NSEC_PER_MSEC };
         pw_loop_update_timer(pw_main_loop_get_loop(m_loop), m_timer, &timeout, &timeout, false);
         break;
     }
     case PW_STREAM_STATE_STREAMING:
+        m_wasConnected = true;
         pw_loop_update_timer(pw_main_loop_get_loop(m_loop), m_timer, nullptr, nullptr, false);
+        break;
+    case PW_STREAM_STATE_UNCONNECTED:
+        if (m_wasConnected) {
+            pw_main_loop_quit(m_loop);
+        }
         break;
     case PW_STREAM_STATE_ERROR:
         pw_main_loop_quit(m_loop);
-        break;
-    default:
         break;
     }
 }
@@ -152,10 +203,19 @@ void PipeWireWorker::processStream() {
     }
 
     const spa_buffer* buf = buffer->buffer;
-    const auto* samples = reinterpret_cast<const qint16*>(buf->datas[0].data);
-    if (samples != nullptr) {
-        const quint32 count = buf->datas[0].chunk->size / sizeof(qint16);
-        m_collector->loadChunk(samples, count);
+    if (buf != nullptr && buf->n_datas > 0 && buf->datas != nullptr && buf->datas[0].data != nullptr &&
+        buf->datas[0].chunk != nullptr) {
+        const spa_data& d = buf->datas[0];
+        const spa_chunk& c = *d.chunk;
+        if ((static_cast<uint32_t>(c.flags) & SPA_CHUNK_FLAG_CORRUPTED) == 0 && c.size > 0 && c.offset < d.maxsize) {
+            const quint32 availableBytes = std::min(c.size, d.maxsize - c.offset);
+            const quint32 count = availableBytes / static_cast<quint32>(sizeof(qint16));
+            if (count > 0) {
+                const auto* base = static_cast<const std::byte*>(d.data) + c.offset;
+                const auto* samples = reinterpret_cast<const qint16*>(base);
+                m_collector->loadChunk(samples, count);
+            }
+        }
     }
 
     pw_stream_queue_buffer(m_stream, buffer);
@@ -164,6 +224,13 @@ void PipeWireWorker::processStream() {
 AudioCollector& AudioCollector::instance() {
     static AudioCollector instance;
     return instance;
+}
+
+AudioCollector* AudioCollector::existingInstance() {
+    if (s_destroyed.load(std::memory_order_acquire)) {
+        return nullptr;
+    }
+    return s_instance.load(std::memory_order_acquire);
 }
 
 void AudioCollector::clearBuffer() {
@@ -193,8 +260,7 @@ void AudioCollector::loadChunk(const qint16* samples, quint32 count) {
     m_samples.push(std::span(samples, count), toFloat);
 }
 
-template <typename T>
-quint32 AudioCollector::readLatest(T* out, quint32 count) {
+template <typename T> quint32 AudioCollector::readLatest(T* out, quint32 count) {
     if (count == 0 || count > ac::CHUNK_SIZE) {
         count = ac::CHUNK_SIZE;
     }
@@ -224,9 +290,13 @@ AudioCollector::AudioCollector(QObject* parent)
     : Service(parent)
     , m_samples(ac::CHUNK_SIZE)
     , m_pending(ac::CHUNK_SIZE)
-    , m_discardPending(false) {}
+    , m_discardPending(false) {
+    s_instance.store(this, std::memory_order_release);
+}
 
 AudioCollector::~AudioCollector() {
+    s_destroyed.store(true, std::memory_order_release);
+    s_instance.store(nullptr, std::memory_order_release);
     AudioCollector::stop();
 }
 
@@ -238,10 +308,15 @@ void AudioCollector::start() {
     clearBuffer();
 
     m_thread = std::jthread([this](std::stop_token token) {
+        std::mutex waitMutex;
+        std::condition_variable_any waitCv;
         while (!token.stop_requested()) {
             PipeWireWorker worker(token, this);
             if (!token.stop_requested()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                std::unique_lock lock(waitMutex);
+                waitCv.wait_for(lock, token, std::chrono::milliseconds(500), [&token]() {
+                    return token.stop_requested();
+                });
             }
         }
     });

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Caelestia
 import Caelestia.Config
 import qs.components
@@ -15,12 +16,28 @@ Item {
     readonly property int spacing: Tokens.spacing.small
     property bool flag
 
+    readonly property HyprlandMonitor monitor: Hypr.monitorFor(root.screen)
+    readonly property bool hasSpecialWorkspace: (monitor?.lastIpcObject?.specialWorkspace?.name?.length ?? 0) > 0
+    readonly property bool hasFullscreenOnNormalWs: (monitor?.activeWorkspace?.hasFullscreen || (monitor?.activeWorkspace?.toplevels?.values?.filter(t => t?.lastIpcObject?.fullscreen > 1).length ?? 0) > 0) ?? false
+    readonly property bool screenHasFullscreen: {
+        if (hasSpecialWorkspace) {
+            const specialName = monitor?.lastIpcObject?.specialWorkspace?.name;
+            if (!specialName)
+                return false;
+            const specialWs = Hypr.workspaces.values.find(ws => ws.name === specialName);
+            return (specialWs?.hasFullscreen || (specialWs?.toplevels?.values?.filter(t => t?.lastIpcObject?.fullscreen > 1).length ?? 0) > 0) ?? false;
+        }
+        return hasFullscreenOnNormalWs;
+    }
+
     function shouldShowToast(toast: Toast): bool {
-        if (root.screen.name !== Hypr.focusedMonitor.name)
+        if (!Hypr.focusedMonitor || root.screen.name !== Hypr.focusedMonitor.name)
             return false;
-        if (!Notifs.hasFullscreen())
+        if (!root.screenHasFullscreen)
             return true;
         if (Config.utilities.toasts.fullscreen === "all")
+            return true;
+        if (toast.type === Toast.Error)
             return true;
         if (Config.utilities.toasts.fullscreen === "important")
             return toast.type === Toast.Warning || toast.type === Toast.Error;
@@ -32,7 +49,7 @@ Item {
         let h = -spacing;
         for (let i = 0; i < repeater.count; i++) {
             const item = repeater.itemAt(i) as ToastWrapper;
-            if (!item.modelData.closed && !item.previewHidden)
+            if (item && !item.modelData.closed && !item.previewHidden)
                 h += item.implicitHeight + spacing;
         }
         return h;
@@ -42,6 +59,8 @@ Item {
         id: repeater
 
         model: ScriptModel {
+            id: toastModel
+
             values: {
                 const toasts = [];
                 let count = 0;
@@ -70,9 +89,10 @@ Item {
         required property Toast modelData
 
         readonly property bool previewHidden: {
+            const list = toastModel.values;
             let extraHidden = 0;
-            for (let i = 0; i < index; i++)
-                if (Toaster.toasts[i].closed)
+            for (let i = 0; i < index && i < list.length; i++)
+                if (list[i]?.closed)
                     extraHidden++;
             return index >= Config.utilities.maxToasts + extraHidden;
         }
@@ -109,7 +129,10 @@ Item {
         Anim {
             id: initAnim
 
-            Component.onCompleted: running = !toast.previewHidden
+            Component.onCompleted: {
+                if (!toast.modelData.closed && !toast.previewHidden)
+                    running = true;
+            }
 
             target: toast
             properties: "opacity,scale"

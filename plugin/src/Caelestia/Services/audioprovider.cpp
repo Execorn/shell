@@ -22,7 +22,6 @@ void AudioProcessor::init() {
 }
 
 void AudioProcessor::start() {
-    QMetaObject::invokeMethod(&AudioCollector::instance(), &AudioCollector::ref, Qt::QueuedConnection, this);
     if (m_timer) {
         m_timer->start();
     }
@@ -32,7 +31,6 @@ void AudioProcessor::stop() {
     if (m_timer && QThread::currentThread() == thread()) {
         m_timer->stop();
     }
-    QMetaObject::invokeMethod(&AudioCollector::instance(), &AudioCollector::unref, Qt::QueuedConnection, this);
 }
 
 AudioProvider::AudioProvider(QObject* parent)
@@ -41,16 +39,28 @@ AudioProvider::AudioProvider(QObject* parent)
     , m_thread(nullptr) {}
 
 AudioProvider::~AudioProvider() {
+    if (auto* ac = AudioCollector::existingInstance()) {
+        ac->unref(this);
+    }
+
     if (m_thread) {
+        if (m_thread->isRunning() && m_processor) {
+            auto* processor = m_processor;
+            m_processor = nullptr;
+            QMetaObject::invokeMethod(
+                processor,
+                [processor]() {
+                    processor->stop();
+                    delete processor;
+                },
+                Qt::BlockingQueuedConnection);
+        }
         m_thread->quit();
         m_thread->wait();
     }
-    if (m_processor) {
-        AudioCollector::instance().unref(m_processor);
-    }
-    auto* processor = m_processor;
+
+    delete m_processor;
     m_processor = nullptr;
-    delete processor;
 }
 
 void AudioProvider::init() {
@@ -75,7 +85,7 @@ void AudioProvider::init() {
 
 void AudioProvider::start() {
     if (m_processor) {
-        AudioCollector::instance(); // Create instance on main thread
+        AudioCollector::instance().ref(this);
         if (m_thread && !m_thread->isRunning()) {
             m_thread->start();
         }
@@ -86,6 +96,9 @@ void AudioProvider::start() {
 void AudioProvider::stop() {
     if (m_processor) {
         QMetaObject::invokeMethod(m_processor, &AudioProcessor::stop);
+    }
+    if (auto* ac = AudioCollector::existingInstance()) {
+        ac->unref(this);
     }
 }
 

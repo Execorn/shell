@@ -100,11 +100,7 @@ StyledRect {
                     delegate: Toggle {
                         icon: "mic"
                         checked: !Audio.sourceMuted
-                        onClicked: {
-                            const audio = Audio.source?.audio;
-                            if (audio)
-                                audio.muted = !audio.muted;
-                        }
+                        onClicked: Audio.toggleSourceMute()
                     }
                 }
                 DelegateChoice {

@@ -25,12 +25,44 @@ Item {
     property bool sourceMuted
     property real brightness
 
+    property var lastSink: null
+    property var lastSource: null
+    property bool sinkSwitching: false
+    property bool sourceSwitching: false
+
     function show(): void {
         visibilities.osd = true;
         timer.restart();
     }
 
+    function syncSinkSnapshot(): void {
+        root.sinkSwitching = true;
+        root.lastSink = Audio.sink;
+        root.volume = Audio.volume;
+        root.muted = Audio.muted;
+        Qt.callLater(() => {
+            root.sinkSwitching = false;
+        });
+    }
+
+    function syncSourceSnapshot(): void {
+        root.sourceSwitching = true;
+        root.lastSource = Audio.source;
+        root.sourceVolume = Audio.sourceVolume;
+        root.sourceMuted = Audio.sourceMuted;
+        Qt.callLater(() => {
+            root.sourceSwitching = false;
+        });
+    }
+
+    onHoveredChanged: {
+        if (!hovered && visibilities.osd)
+            timer.restart();
+    }
+
     Component.onCompleted: {
+        lastSink = Audio.sink;
+        lastSource = Audio.source;
         volume = Audio.volume;
         muted = Audio.muted;
         sourceVolume = Audio.sourceVolume;
@@ -50,29 +82,64 @@ Item {
 
     Connections {
         function onOsdTriggered(): void {
-            root.show();
+            root.lastSink = Audio.sink;
             root.volume = Audio.volume;
             root.muted = Audio.muted;
+            root.show();
+        }
+
+        function onSourceOsdTriggered(): void {
+            root.lastSource = Audio.source;
+            root.sourceVolume = Audio.sourceVolume;
+            root.sourceMuted = Audio.sourceMuted;
+            if (root.Config.osd.enableMicrophone)
+                root.show();
+        }
+
+        function onSinkChanged(): void {
+            root.syncSinkSnapshot();
+        }
+
+        function onSourceChanged(): void {
+            root.syncSourceSnapshot();
         }
 
         function onMutedChanged(): void {
-            root.show();
+            if (Audio.startupEnumerating || root.sinkSwitching || root.lastSink !== Audio.sink) {
+                root.syncSinkSnapshot();
+                return;
+            }
             root.muted = Audio.muted;
+            root.show();
         }
 
         function onVolumeChanged(): void {
-            root.show();
+            if (Audio.startupEnumerating || root.sinkSwitching || root.lastSink !== Audio.sink) {
+                root.syncSinkSnapshot();
+                return;
+            }
             root.volume = Audio.volume;
+            root.show();
         }
 
         function onSourceMutedChanged(): void {
-            root.show();
+            if (Audio.startupEnumerating || root.sourceSwitching || root.lastSource !== Audio.source) {
+                root.syncSourceSnapshot();
+                return;
+            }
             root.sourceMuted = Audio.sourceMuted;
+            if (root.Config.osd.enableMicrophone)
+                root.show();
         }
 
         function onSourceVolumeChanged(): void {
-            root.show();
+            if (Audio.startupEnumerating || root.sourceSwitching || root.lastSource !== Audio.source) {
+                root.syncSourceSnapshot();
+                return;
+            }
             root.sourceVolume = Audio.sourceVolume;
+            if (root.Config.osd.enableMicrophone)
+                root.show();
         }
 
         target: Audio

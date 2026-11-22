@@ -27,7 +27,7 @@ Scope {
 
     Connections {
         function onLoadFailed(error: string, screen: string): void {
-            Toaster.toast(qsTr("Failed to parse token config%1").arg(screen ? "for " + screen : ""), error, "settings_alert", Toast.Warning);
+            Toaster.toast(qsTr("Failed to parse token config%1").arg(screen ? " for " + screen : ""), error, "settings_alert", Toast.Warning);
         }
 
         function onUnknownOption(key: string, screen: string): void {

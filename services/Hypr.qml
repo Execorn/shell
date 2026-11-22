@@ -215,12 +215,6 @@ Singleton {
 
     onKbLayoutFullChanged: {
         if (hadKeyboard && kbLayoutFull && kbLayoutFull !== "Unknown" && kbLayoutFull !== lastKbLayoutFull && GlobalConfig.utilities.toasts.kbLayoutChanged) {
-            for (let i = 0; i < Toaster.toasts.length; i++) {
-                const t = Toaster.toasts[i];
-                if (t.title === qsTr("Keyboard layout changed") && !t.closed) {
-                    t.close();
-                }
-            }
             Toaster.toast(qsTr("Keyboard layout changed"), qsTr("Layout changed to: %1").arg(kbLayoutFull), "keyboard");
         }
 

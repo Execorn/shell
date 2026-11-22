@@ -15,8 +15,11 @@ ConnectedRect {
     property alias label: label.text
     property alias valueLabel: valueLabel.text
     property real value
+    property real to: 1
+    property bool showMuteButton: false
 
     signal moved(value: real)
+    signal muteToggled()
 
     Layout.fillWidth: true
     implicitHeight: rowLayout.implicitHeight + rowLayout.anchors.margins + rowLayout.anchors.topMargin
@@ -32,8 +35,16 @@ ConnectedRect {
         MaterialIcon {
             id: icon
 
+            visible: !root.showMuteButton
             color: Colours.palette.m3onSurfaceVariant
             fontStyle: Tokens.font.icon.medium
+        }
+
+        IconButton {
+            visible: root.showMuteButton
+            type: IconButton.Text
+            icon: root.icon
+            onClicked: root.muteToggled()
         }
 
         ColumnLayout {
@@ -64,7 +75,7 @@ ConnectedRect {
                 function onWheel(event: WheelEvent): void {
                     const step = GlobalConfig.services.audioIncrement;
                     if (event.angleDelta.y > 0)
-                        root.moved(Math.min(1, root.value + step));
+                        root.moved(Math.min(root.to, root.value + step));
                     else if (event.angleDelta.y < 0)
                         root.moved(Math.max(0, root.value - step));
                 }
@@ -79,6 +90,7 @@ ConnectedRect {
                     implicitHeight: parent.implicitHeight
 
                     radius: Tokens.rounding.small
+                    to: root.to
                     value: root.value
                     enabled: root.enabled
                     onInteraction: v => root.moved(v)

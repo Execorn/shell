@@ -18,6 +18,7 @@ qml_module(caelestia-services
         lyriccandidate.cpp
         lyrics.cpp
         sessionmanager.cpp
+        bluezagent.cpp
     LIBRARIES
         Qt::Concurrent
         Qt::DBus

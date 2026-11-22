@@ -52,18 +52,22 @@ PageBase {
 
                 required property PwNode modelData
                 required property int index
+                readonly property bool streamMuted: Audio.getStreamMuted(stream.modelData)
+                readonly property real streamVolume: Audio.getStreamVolume(stream.modelData)
 
                 anchors.left: streamList.list.contentItem.left
                 anchors.right: streamList.list.contentItem.right
                 first: index === 0
                 last: index === streamList.list.count - 1
 
-                icon: Icons.getVolumeIcon(stream.modelData?.audio?.volume ?? 0, stream.modelData?.audio?.muted ?? false)
+                showMuteButton: true
+                icon: Icons.getVolumeIcon(streamVolume, streamMuted)
                 label: Audio.getStreamName(stream.modelData)
-                valueLabel: Math.round(value * 100) + "%"
-                value: stream.modelData?.audio?.volume ?? 0
-                enabled: !stream.modelData?.audio?.muted
+                valueLabel: streamMuted ? qsTr("Muted") : Math.round(value * 100) + "%"
+                to: GlobalConfig.services.maxVolume
+                value: streamVolume
                 onMoved: v => Audio.setStreamVolume(stream.modelData, v)
+                onMuteToggled: Audio.setStreamMuted(stream.modelData, !streamMuted)
             }
         }
     }

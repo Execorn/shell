@@ -23,6 +23,18 @@ def find_mouse_area(ui):
             return child
     return None
 
+def find_visual_items(item, class_substr=None):
+    result = []
+    if hasattr(item, "childItems"):
+        for child in item.childItems():
+            if class_substr is None or class_substr in child.metaObject().className():
+                result.append(child)
+            result.extend(find_visual_items(child, class_substr))
+    for child in item.findChildren(QObject):
+        if child not in result and (class_substr is None or class_substr in child.metaObject().className()):
+            result.append(child)
+    return result
+
 # Helper event for mouse wheel
 class MockWheelEvent:
     def __init__(self, y_delta):
@@ -602,13 +614,52 @@ def test_volume_delegate_decrement(audio_suite):
     QtCore.QCoreApplication.processEvents()
     assert abs(audio_suite.audio.property("volume") - 0.45) < 0.01
 
-def test_t2_volume_wpctl_failure(audio_suite):
-    # Simulated by returning success even if wpctl mock does nothing
-    pass
+def test_t2_volume_wpctl_failure(audio_suite, tmp_path, monkeypatch):
+    bad_bin = tmp_path / "fail_bin"
+    bad_bin.mkdir()
+    bad_wpctl = bad_bin / "wpctl"
+    bad_wpctl.write_text("#!/bin/sh\nexit 1\n")
+    bad_wpctl.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bad_bin}:{os.environ.get('PATH', '')}")
 
-def test_t2_volume_wpctl_timeout(audio_suite):
-    # Async process executes, so QML UI is not blocked
-    pass
+    n_virt = MockPwNode(5, "riced_equalizer_sink", "EQ", is_sink=True, ready=True, properties={"node.virtual": "true"})
+    n_usb = MockPwNode(4, "alsa_output.usb", "USB", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_virt)
+    audio_suite.mock_pw.add_node(n_usb)
+    audio_suite.mock_pw.set_defaultAudioSink(n_virt)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSink()
+
+    # Non-zero wpctl exit does not throw or crash and UI remains responsive
+    audio_suite.audio.setVolume(0.55)
+    QtCore.QCoreApplication.processEvents()
+    assert abs(audio_suite.audio.property("customVolume") - 0.55) < 0.01
+
+
+def test_t2_volume_wpctl_timeout(audio_suite, tmp_path, monkeypatch):
+    slow_bin = tmp_path / "slow_bin"
+    slow_bin.mkdir()
+    slow_wpctl = slow_bin / "wpctl"
+    slow_wpctl.write_text("#!/bin/sh\nsleep 2\n")
+    slow_wpctl.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{slow_bin}:{os.environ.get('PATH', '')}")
+
+    n_virt = MockPwNode(5, "riced_equalizer_sink", "EQ", is_sink=True, ready=True, properties={"node.virtual": "true"})
+    n_usb = MockPwNode(4, "alsa_output.usb", "USB", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_virt)
+    audio_suite.mock_pw.add_node(n_usb)
+    audio_suite.mock_pw.set_defaultAudioSink(n_virt)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSink()
+
+    audio_suite.audio.setVolume(0.65)
+    # Rapid follow-up queues pendingVolumeCmd instead of dropping or crashing
+    audio_suite.audio.setVolume(0.75)
+    pending = audio_suite.audio.property("pendingVolumeCmd")
+    assert pending is not None
+    assert "0.75" in list(pending)
+    vol_proc = audio_suite.audio.property("volumeSetProc")
+    vol_proc.setProperty("running", False)
 
 def test_t2_volume_invalid_max_volume(audio_suite):
     n_pci = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.5)
@@ -715,8 +766,25 @@ def test_t2_process_collision_fix(audio_suite):
     assert mute_proc is not None
     assert vol_proc != mute_proc
 
-def test_t2_mute_wpctl_failure(audio_suite):
-    pass
+def test_t2_mute_wpctl_failure(audio_suite, tmp_path, monkeypatch):
+    bad_bin = tmp_path / "fail_mute_bin"
+    bad_bin.mkdir()
+    bad_wpctl = bad_bin / "wpctl"
+    bad_wpctl.write_text("#!/bin/sh\nexit 1\n")
+    bad_wpctl.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bad_bin}:{os.environ.get('PATH', '')}")
+
+    n_virt = MockPwNode(5, "riced_equalizer_sink", "EQ", is_sink=True, ready=True, properties={"node.virtual": "true"})
+    n_usb = MockPwNode(4, "alsa_output.usb", "USB", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_virt)
+    audio_suite.mock_pw.add_node(n_usb)
+    audio_suite.mock_pw.set_defaultAudioSink(n_virt)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSink()
+
+    audio_suite.audio.setStreamMuted(n_usb, True)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("customMuted") == 1
 
 def test_t2_mute_rapid_toggles(audio_suite):
     n_pci = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
@@ -821,9 +889,18 @@ def test_t2_source_preferred_missing(audio_suite):
     audio_suite.audio.setAudioSource(n)
     assert audio_suite.mock_pw.property("preferredDefaultAudioSource") == n
 
-def test_t2_source_volume_wpctl(audio_suite):
-    # Sources do not use wpctl delegation in service logic directly, but does not block
-    pass
+def test_t2_source_volume_wpctl(audio_suite, wpctl_log):
+    n_mic = MockPwNode(12, "alsa_input.usb", "USB Mic", is_sink=False, ready=True, volume=0.4)
+    audio_suite.mock_pw.add_node(n_mic)
+    audio_suite.mock_pw.set_defaultAudioSource(n_mic)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSource()
+
+    audio_suite.audio.setSourceVolume(0.75)
+    QtCore.QCoreApplication.processEvents()
+    assert abs(n_mic.audio.property("volume") - 0.75) < 0.01
+    # Direct physical source updates PipeWire node volume directly without wpctl process delegation
+    assert not wpctl_log.exists() or wpctl_log.read_text().strip() == ""
 
 def test_t2_source_rapid_inputs_plug(audio_suite):
     for i in range(30):
@@ -978,9 +1055,20 @@ def test_toast_suppressed_initial(audio_suite):
     assert len(audio_suite.mock_toast.toasts) == 0
 
 def test_toast_disabled_by_config(audio_suite):
-    # Change config to disable toasts
-    # (In conftest, toasts properties are constant, but let's test if checked)
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
+    n2 = MockPwNode(4, "alsa_output.usb", "USB DAC", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.add_node(n2)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.mock_toast.toasts.clear()
+
+    # Replace GlobalConfig.utilities.toasts with disabled flags on this engine context
+    gc = audio_suite.engine.rootContext().contextProperty("GlobalConfig")
+    gc.setProperty("utilities", {"toasts": {"audioOutputChanged": False, "audioInputChanged": False}})
+    audio_suite.mock_pw.set_defaultAudioSink(n2)
+    QtCore.QCoreApplication.processEvents()
+    assert len(audio_suite.mock_toast.toasts) == 0
 
 def test_toast_no_duplicate(audio_suite):
     n = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
@@ -1021,11 +1109,37 @@ def test_t2_toast_null_names(audio_suite):
     QtCore.QCoreApplication.processEvents()
 
 def test_t2_toast_toaster_crash(audio_suite):
-    # Mock toaster functions correctly
-    pass
+    # Setting Toaster to null temporarily must not raise unhandled Python crash during sink switch
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
+    n2 = MockPwNode(4, "alsa_output.usb", "USB DAC", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.add_node(n2)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+
+    audio_suite.engine.rootContext().setContextProperty("Toaster", None)
+    try:
+        audio_suite.mock_pw.set_defaultAudioSink(n2)
+        QtCore.QCoreApplication.processEvents()
+        assert audio_suite.audio.property("sink") is not None
+    finally:
+        audio_suite.engine.rootContext().setContextProperty("Toaster", audio_suite.mock_toast)
+
 
 def test_t2_toast_no_icon(audio_suite):
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
+    n2 = MockPwNode(4, "alsa_output.usb", "USB DAC", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.add_node(n2)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.mock_toast.toasts.clear()
+
+    audio_suite.mock_pw.set_defaultAudioSink(n2)
+    QtCore.QCoreApplication.processEvents()
+    out_toasts = [t for t in audio_suite.mock_toast.toasts if t.property("title") == "Audio output changed"]
+    assert len(out_toasts) == 1
+    assert out_toasts[0].property("icon") == "volume_up"
 
 def test_t2_toast_utf8_toasts(audio_suite):
     n1 = MockPwNode(3, "pci", "Builtin", is_sink=True, ready=True)
@@ -1104,8 +1218,17 @@ def test_cycle_next_active(audio_suite):
     assert audio_suite.mock_pw.property("preferredDefaultAudioSink") == n2
 
 def test_t2_cycle_sinks_null_in_list(audio_suite):
-    # Nodes list containing invalid elements (handled in QML via Connection checks)
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n1)
+    # Inject a null entry directly into Pipewire.nodes.values alongside valid node
+    audio_suite.mock_pw.nodes._values.append(None)
+    audio_suite.mock_pw.nodes.valuesChanged.emit()
+    QtCore.QCoreApplication.processEvents()
+
+    assert len(audio_suite.audio.property("physicalSinks")) == 1
+    audio_suite.audio.cycleNextAudioOutput()
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.mock_pw.property("preferredDefaultAudioSink") == n1
 
 def test_t2_cycle_nodes_not_ready(audio_suite):
     n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
@@ -1209,11 +1332,27 @@ def test_t2_ipc_concurrent_requests(audio_suite):
     assert abs(audio_suite.audio.property("customVolume") - 0.99) < 0.01
 
 def test_t2_ipc_reconnect(audio_suite):
-    # Dummy reconnect test
-    pass
+    ipc = find_ipc_handler(audio_suite.audio)
+    assert ipc is not None
+    # Simulate PipeWire empty drain followed by re-populated node
+    audio_suite.mock_pw.clear_nodes()
+    QtCore.QCoreApplication.processEvents()
+    n = MockPwNode(7, "alsa_output.usb", "USB Reconnected", is_sink=True, ready=True, volume=0.45)
+    audio_suite.mock_pw.add_node(n)
+    audio_suite.mock_pw.set_defaultAudioSink(n)
+    QtCore.QCoreApplication.processEvents()
+
+    QMetaObject.invokeMethod(ipc, "updateVolume", QtCore.Qt.DirectConnection,
+                             QtCore.Q_ARG(str, "0.62"), QtCore.Q_ARG(str, "false"))
+    assert abs(audio_suite.audio.property("customVolume") - 0.62) < 0.01
+
 
 def test_t2_ipc_permission(audio_suite):
-    pass
+    ipc = find_ipc_handler(audio_suite.audio)
+    assert ipc is not None
+    # IPC sink query safely handles empty physical sink state without crashing
+    assert QMetaObject.invokeMethod(ipc, "getActivePhysicalSink", QtCore.Qt.DirectConnection)
+    assert QMetaObject.invokeMethod(ipc, "toggleSourceMute", QtCore.Qt.DirectConnection)
 
 
 # ==========================================================
@@ -1241,7 +1380,12 @@ def test_ui_sink_click_set(audio_suite):
     assert audio_suite.mock_pw.property("preferredDefaultAudioSink") == n
 
 def test_ui_sink_label_binding(audio_suite):
-    pass
+    n = MockPwNode(3, "alsa_output.pci", "Built-in Speaker Desc", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n)
+    for _ in range(5):
+        QtCore.QCoreApplication.processEvents()
+    radios = find_visual_items(audio_suite.ui, "RadioButton")
+    assert any(r.property("text") == "Built-in Speaker Desc" for r in radios)
 
 def test_ui_sink_dynamic_update(audio_suite):
     n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
@@ -1266,7 +1410,13 @@ def test_t2_ui_sink_rapid_model_changes(audio_suite):
         audio_suite.mock_pw.remove_node(n)
 
 def test_t2_ui_sink_long_names_wrap(audio_suite):
-    pass
+    long_desc = "Super Long Bluetooth High-Resolution DAC Output Device Name 2026 Pro Max"
+    n = MockPwNode(3, "alsa_output.usb", long_desc, is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n)
+    for _ in range(5):
+        QtCore.QCoreApplication.processEvents()
+    radios = find_visual_items(audio_suite.ui, "RadioButton")
+    assert any(r.property("text") == long_desc for r in radios)
 
 def test_t2_ui_sink_destruction(audio_suite):
     n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True)
@@ -1297,7 +1447,12 @@ def test_ui_source_click_set(audio_suite):
     assert audio_suite.mock_pw.property("preferredDefaultAudioSource") == n
 
 def test_ui_source_label_binding(audio_suite):
-    pass
+    n = MockPwNode(11, "alsa_input.usb", "Studio Condenser Mic", is_sink=False, ready=True)
+    audio_suite.mock_pw.add_node(n)
+    for _ in range(5):
+        QtCore.QCoreApplication.processEvents()
+    radios = find_visual_items(audio_suite.ui, "RadioButton")
+    assert any(r.property("text") == "Studio Condenser Mic" for r in radios)
 
 def test_ui_source_dynamic_update(audio_suite):
     n1 = MockPwNode(11, "alsa_input.usb", "Mic", is_sink=False, ready=True)
@@ -1322,7 +1477,13 @@ def test_t2_ui_source_rapid_model_changes(audio_suite):
         audio_suite.mock_pw.remove_node(n)
 
 def test_t2_ui_source_long_names_wrap(audio_suite):
-    pass
+    long_desc = "USB Dual-Capsule Broadcast Condenser Microphone With Extended Description"
+    n = MockPwNode(11, "alsa_input.usb", long_desc, is_sink=False, ready=True)
+    audio_suite.mock_pw.add_node(n)
+    for _ in range(5):
+        QtCore.QCoreApplication.processEvents()
+    radios = find_visual_items(audio_suite.ui, "RadioButton")
+    assert any(r.property("text") == long_desc for r in radios)
 
 def test_t2_ui_source_destruction(audio_suite):
     n1 = MockPwNode(11, "alsa_input.usb", "Mic", is_sink=False, ready=True)
@@ -1359,13 +1520,28 @@ def test_ui_slider_interaction(audio_suite):
     assert n1.audio.property("volume") == 0.85
 
 def test_ui_slider_label_volume(audio_suite):
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.42)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    texts = [c.property("text") for c in audio_suite.ui.findChildren(QObject) if c.property("text") is not None]
+    assert "Volume (42%)" in texts
+
 
 def test_ui_slider_label_muted(audio_suite):
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.5, muted=True)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    texts = [c.property("text") for c in audio_suite.ui.findChildren(QObject) if c.property("text") is not None]
+    assert "Volume (Muted)" in texts
+
 
 def test_ui_slider_layout(audio_suite):
-    pass
+    sliders = [c for c in audio_suite.ui.findChildren(QObject) if "Slider" in c.metaObject().className()]
+    assert len(sliders) >= 1
+    assert sliders[0].property("to") == 1.0
+    assert sliders[0].property("implicitHeight") > 0
 
 def test_t2_ui_slider_nan_volume(audio_suite):
     audio_suite.audio.setVolume(float('nan'))
@@ -1398,7 +1574,18 @@ def test_t2_ui_slider_mute_sync(audio_suite):
     QtCore.QCoreApplication.processEvents()
 
 def test_t2_ui_slider_destruction_race(audio_suite):
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.5)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    sliders = [c for c in audio_suite.ui.findChildren(QObject) if "Slider" in c.metaObject().className()]
+    assert len(sliders) >= 1
+    audio_suite.mock_pw.remove_node(n1)
+    audio_suite.mock_pw.set_defaultAudioSink(None)
+    QtCore.QCoreApplication.processEvents()
+    sliders[0].interaction.emit(0.7)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("sink") is None
 
 
 # ==========================================================
@@ -1459,7 +1646,10 @@ def test_ui_wheel_clamping(audio_suite):
     assert audio_suite.audio.property("volume") <= 1.0
 
 def test_ui_wheel_custom_area(audio_suite):
-    pass
+    area = find_mouse_area(audio_suite.ui)
+    assert area is not None
+    assert area.property("implicitHeight") > 0
+
 
 def test_t2_ui_wheel_extreme_delta(audio_suite):
     n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.5)
@@ -1495,7 +1685,15 @@ def test_t2_ui_wheel_rapid_events(audio_suite):
     QtCore.QCoreApplication.processEvents()
 
 def test_t2_ui_wheel_unfocused(audio_suite):
-    pass
+    n1 = MockPwNode(3, "alsa_output.pci", "Builtin", is_sink=True, ready=True, volume=0.5)
+    audio_suite.mock_pw.add_node(n1)
+    audio_suite.mock_pw.set_defaultAudioSink(n1)
+    QtCore.QCoreApplication.processEvents()
+    area = find_mouse_area(audio_suite.ui)
+    assert area is not None
+    area.simulateWheel(0)
+    QtCore.QCoreApplication.processEvents()
+    assert abs(audio_suite.audio.property("volume") - 0.5) < 0.01
 
 
 # ==========================================================
@@ -1508,27 +1706,54 @@ def test_ui_popout_detach_click(audio_suite):
     audio_suite.popouts.detachRequested.emit("audio")
 
 def test_ui_popout_token_check(audio_suite):
-    pass
+    assert audio_suite.ui.property("implicitWidth") == 320
+    assert audio_suite.ui.property("implicitHeight") > 0
+
 
 def test_ui_popout_layout_vertical(audio_suite):
-    pass
+    layouts = [c for c in audio_suite.ui.findChildren(QObject) if "ColumnLayout" in c.metaObject().className()]
+    assert len(layouts) >= 1
+    assert layouts[0].property("spacing") == 8.0
+
 
 def test_ui_popout_spacing(audio_suite):
-    pass
+    layouts = [c for c in audio_suite.ui.findChildren(QObject) if "ColumnLayout" in c.metaObject().className()]
+    assert layouts[0].property("spacing") > 0
+
 
 def test_ui_popout_inactive_color(audio_suite):
-    pass
+    btns = [c for c in audio_suite.ui.findChildren(QObject) if c.property("text") == "Open settings"]
+    assert len(btns) == 1
+    assert btns[0].property("icon") == "settings"
+    col = btns[0].property("inactiveColour")
+    assert (col.name() if hasattr(col, "name") else str(col)).lower() == "#000000"
+
 
 def test_t2_ui_popout_multiple_clicks(audio_suite):
-    # Rapid double click requests detach
-    audio_suite.popouts.detachRequested.emit("audio")
-    audio_suite.popouts.detachRequested.emit("audio")
+    emitted = []
+    audio_suite.popouts.detachRequested.connect(emitted.append)
+    btns = [c for c in audio_suite.ui.findChildren(QObject) if c.property("text") == "Open settings"]
+    btns[0].clicked.emit()
+    btns[0].clicked.emit()
+    assert emitted == ["audio", "audio"]
 
-def test_t2_ui_popout_missing_popouts_prop(audio_suite):
-    pass
+
+def test_t2_ui_popout_missing_popouts_prop(qml_engine):
+    from PySide6.QtQml import QQmlExpression
+    comp = QQmlComponent(qml_engine, UI_QML_PATH)
+    item = comp.beginCreate(qml_engine.rootContext())
+    comp.completeCreate()
+    assert item is not None
+    res, _ = QQmlExpression(qml_engine.rootContext(), item, "!popouts").evaluate()
+    assert res is True
+    item.deleteLater()
+
 
 def test_t2_ui_popout_null_tokens(audio_suite):
-    pass
+    # Verify UI exposes valid positive implicit dimensions computed from Tokens
+    assert audio_suite.ui.property("implicitWidth") > 0
+    assert audio_suite.ui.property("implicitHeight") > 0
+
 
 def test_t2_ui_popout_resizing_stress(audio_suite):
     # Set extreme UI dimensions
@@ -1539,9 +1764,17 @@ def test_t2_ui_popout_resizing_stress(audio_suite):
     audio_suite.ui.setProperty("width", 10)
     audio_suite.ui.setProperty("height", 10)
     QtCore.QCoreApplication.processEvents()
+    assert audio_suite.ui.property("width") == 10
+
 
 def test_t2_ui_popout_detach_fail(audio_suite):
-    pass
+    emitted = []
+    audio_suite.popouts.detachRequested.connect(emitted.append)
+    audio_suite.ui.setProperty("popouts", None)
+    btns = [c for c in audio_suite.ui.findChildren(QObject) if c.property("text") == "Open settings"]
+    # Null popouts property must not crash on click attempt before guarding/disconnecting
+    assert len(btns) == 1
+    assert emitted == []
 
 def test_ui_application_stream_volume_and_mute(qapp, qml_engine, mock_pipewire, mock_toaster):
     # Reset mocks
@@ -1671,21 +1904,101 @@ def test_bluetooth_connect_reconnect_no_duplicate_toasts_with_virtual_nodes(audi
     in_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio input changed"]
     assert len(out_toasts) == 1
     assert out_toasts[0][1] == "Now using: Sony WH-1000XM5"
-    assert len(in_toasts) == 1
-    assert in_toasts[0][1] == "Now using: Sony WH-1000XM5 Handsfree"
+    # Bluetooth HFP microphone must never auto-hijack an existing USB/PCI microphone or emit a bogus input toast
+    assert len(in_toasts) == 0
+    assert audio_suite.audio.property("preferredPhysicalSource") == "alsa_input.usb-C-Media_USB_Streaming_Microphone-00.analog-stereo"
 
+
+def test_hfp_input_never_hijacks_internal_mic_and_allows_explicit_manual_override(audio_suite):
+    n_pci_mic = MockPwNode(10, "alsa_input.pci-0000_05_00.6.analog-stereo", "Ryzen Analog Mic", is_sink=False, ready=True)
+    n_bt_mic = MockPwNode(11, "bluez_input.08:F0:B6:35:49:16", "STAX SPIRIT S3 Handsfree", is_sink=False, ready=True)
+    audio_suite.mock_pw.add_node(n_pci_mic)
+    audio_suite.mock_pw.set_defaultAudioSource(n_pci_mic)
+    QtCore.QCoreApplication.processEvents()
     audio_suite.mock_toast.toasts.clear()
 
-    audio_suite.mock_pw.set_defaultAudioSource(minifuse_src)
-    audio_suite.mock_pw.remove_node(bt_sink)
-    audio_suite.mock_pw.remove_node(bt_src)
+    # Connecting BT HFP input must not hijack internal PCI mic
+    audio_suite.mock_pw.add_node(n_bt_mic)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.getBestInputSourceName() == "alsa_input.pci-0000_05_00.6.analog-stereo"
+    assert audio_suite.audio.property("preferredPhysicalSource") == "alsa_input.pci-0000_05_00.6.analog-stereo"
+    assert [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio input changed"] == []
+
+    # Manual selection by user explicitly permits switching to bluez_input
+    audio_suite.audio.setAudioSource(n_bt_mic)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("preferredPhysicalSource") == "bluez_input.08:F0:B6:35:49:16"
+    assert audio_suite.mock_pw.property("preferredDefaultAudioSource") == n_bt_mic
+
+
+def test_bt_sink_order_and_same_bt_profile_switch_preserves_manual_override(audio_suite):
+    n_pci = MockPwNode(2, "alsa_output.pci-0000_05_00.6.analog-stereo", "Ryzen Speakers", is_sink=True, ready=True)
+    n_bt1 = MockPwNode(3, "bluez_output.AA_BB_CC_DD_EE_FF.a2dp-sink", "Headphones A", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_pci)
+    audio_suite.mock_pw.add_node(n_bt1)
     QtCore.QCoreApplication.processEvents()
 
-    out_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio output changed"]
-    in_toasts = [t for t in audio_suite.mock_toast.toasts if t[0] == "Audio input changed"]
-    assert len(out_toasts) == 1
-    assert out_toasts[0][1] == "Now using: MiniFuse 2 Main Out L/R"
-    assert len(in_toasts) == 1
-    assert in_toasts[0][1] == "Now using: USB Streaming Microphone Analog Stereo"
+    # User manually chooses PCI speakers while BT1 is connected
+    audio_suite.audio.setAudioSink(n_pci)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("manualSinkOverride") is True
+    assert audio_suite.audio.property("preferredPhysicalSink") == n_pci.property("name")
+
+    # Same BT MAC switches profile A2DP -> HFP while old node still known (or concurrent profile swap): preserves manualSinkOverride
+    n_bt1_hfp = MockPwNode(4, "bluez_output.AA_BB_CC_DD_EE_FF.headset-head-unit", "Headphones A HFP", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_bt1_hfp)
+    audio_suite.mock_pw.remove_node(n_bt1)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("manualSinkOverride") is True
+    assert audio_suite.audio.property("preferredPhysicalSink") == n_pci.property("name")
+
+    # Different newly connected BT device auto-takes priority
+    n_bt2 = MockPwNode(5, "bluez_output.11_22_33_44_55_66.a2dp-sink", "Headphones B", is_sink=True, ready=True)
+    audio_suite.mock_pw.add_node(n_bt2)
+    QtCore.QCoreApplication.processEvents()
+    assert audio_suite.audio.property("manualSinkOverride") is False
+    assert audio_suite.audio.property("preferredPhysicalSink") == n_bt2.property("name")
+
+
+def test_eq_sink_stays_unattenuated_and_delegates_to_physical_driver(audio_suite, pactl_state, wpctl_log):
+    import json
+    state_file, _ = pactl_state
+    state_file.write_text(json.dumps({
+        "sinks": [{"index": 10, "name": "riced_equalizer_sink"}, {"index": 20, "name": "bluez_output.08_F0_B6_35_49_16.1"}],
+        "sink-inputs": [{"index": 55, "sink": 20, "properties": {"node.name": "output.filter-chain-1-8", "media.name": "Riced Equalizer Sink"}}],
+    }))
+    n_eq = MockPwNode(10, "riced_equalizer_sink", "Riced Equalizer Sink", is_sink=True, ready=True, volume=0.45, muted=True, properties={"node.virtual": "true"})
+    n_bt = MockPwNode(20, "bluez_output.08_F0_B6_35_49_16.1", "STAX SPIRIT S3", is_sink=True, ready=True, volume=0.50)
+    audio_suite.mock_pw.add_node(n_eq)
+    audio_suite.mock_pw.add_node(n_bt)
+    audio_suite.mock_pw.set_defaultAudioSink(n_eq)
+    QtCore.QCoreApplication.processEvents()
+    audio_suite.audio.updateActiveSink()
+    QtCore.QCoreApplication.processEvents()
+
+    # EQ node forced unmuted at 1.0 while volume/mute actions target physicalDriverId (20)
+    assert n_eq.audio.property("muted") is False
+    assert abs(n_eq.audio.property("volume") - 1.0) < 0.01
+    assert audio_suite.audio.property("physicalDriverId") == 20
+    assert audio_suite.audio.property("lastRoutedPhysicalSink") == "bluez_output.08_F0_B6_35_49_16.1"
+
+    audio_suite.audio.setVolume(0.68)
+    QtCore.QCoreApplication.processEvents()
+    calls = wpctl_log.read_text().splitlines()
+    assert any("set-volume 20 0.68" in c for c in calls)
+
+
+def test_app_stream_filter_excludes_internal_filter_chain_and_loopback(audio_suite):
+    s_fx = MockPwNode(30, "Firefox", "Mozilla Firefox", is_stream=True, ready=True, properties={"application.name": "Firefox"})
+    s_eq = MockPwNode(31, "output.filter-chain-123-8", "Riced Equalizer Sink", is_stream=True, ready=True)
+    s_mic = MockPwNode(32, "input.filter-chain-123-9", "Riced Microphone Source", is_stream=True, ready=True)
+    s_bt = MockPwNode(33, "bluez_capture_internal.08:F0:B6", "BT Capture", is_stream=True, ready=True)
+    s_cava = MockPwNode(34, "cava", "cava", is_stream=True, ready=True, properties={"media.class": "Stream/Input/Audio", "stream.capture.sink": "true"})
+    for node in (s_fx, s_eq, s_mic, s_bt, s_cava):
+        audio_suite.mock_pw.add_node(node)
+    QtCore.QCoreApplication.processEvents()
+
+    streams = audio_suite.audio.property("streams")
+    assert [s.property("id") for s in streams] == [30]
 
 

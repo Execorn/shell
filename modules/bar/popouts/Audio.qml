@@ -50,7 +50,7 @@ Item {
                 ButtonGroup.group: sinks
                 checked: modelData ? Audio.activePhysicalSinkId === modelData.id : false
                 onClicked: if (modelData) Audio.setAudioSink(modelData)
-                text: modelData ? modelData.description : ""
+                text: modelData ? (modelData.description || modelData.name || "") : ""
             }
         }
 
@@ -70,7 +70,7 @@ Item {
                 ButtonGroup.group: sources
                 checked: modelData ? Audio.activePhysicalSourceId === modelData.id : false
                 onClicked: if (modelData) Audio.setAudioSource(modelData)
-                text: modelData ? modelData.description : ""
+                text: modelData ? (modelData.description || modelData.name || "") : ""
             }
         }
 
@@ -96,6 +96,7 @@ Item {
                 anchors.right: parent.right
                 implicitHeight: parent.implicitHeight
 
+                to: GlobalConfig.services.maxVolume
                 value: Audio.volume
                 onInteraction: value => Audio.setVolume(value)
             }
@@ -144,6 +145,7 @@ Item {
                         anchors.right: parent.right
                         implicitHeight: parent.implicitHeight
 
+                        to: GlobalConfig.services.maxVolume
                         value: Audio.getStreamVolume(modelData)
                         onInteraction: value => Audio.setStreamVolume(modelData, value)
                     }

@@ -71,6 +71,8 @@ StyledWindow {
         visibilities.dashboard = false;
         visibilities.cheatsheet = false;
         visibilities.newsfeed = false;
+        visibilities.utilities = false;
+        visibilities.sidebar = false;
         panels.popouts.close();
     }
 
