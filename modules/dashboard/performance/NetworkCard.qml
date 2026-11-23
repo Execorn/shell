@@ -74,6 +74,14 @@ StyledRect {
                     target: NetworkUsage.downloadBuffer
                 }
 
+                Connections {
+                    function onMaximumChanged(): void {
+                        sparkline.targetMax = Math.max(NetworkUsage.downloadBuffer.maximum, NetworkUsage.uploadBuffer.maximum, 1024);
+                    }
+
+                    target: NetworkUsage.uploadBuffer
+                }
+
                 NumberAnimation {
                     id: slideAnim
 

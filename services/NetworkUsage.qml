@@ -30,18 +30,28 @@ Singleton {
     property real _downloadTotal: 0
     property real _uploadTotal: 0
 
-    // Previous readings for calculating speed
-    property real _prevRxBytes: 0
-    property real _prevTxBytes: 0
+    // Per-interface previous counters and sampling state
+    property var _prevByIface: ({})
     property real _prevTimestamp: 0
-
-    // Initial readings for calculating totals
-    property real _initialRxBytes: 0
-    property real _initialTxBytes: 0
     property bool _initialized: false
 
+    // Sysfs physical/virtual classification cache (iface -> true if physical hardware NIC)
+    property var _sysfsPhysical: ({})
+    property bool _probePending: false
+
+    function reset(): void {
+        root._downloadSpeed = 0;
+        root._uploadSpeed = 0;
+        root._downloadTotal = 0;
+        root._uploadTotal = 0;
+        root._prevByIface = {};
+        root._prevTimestamp = 0;
+        root._initialized = false;
+        downloadHistory.clear();
+        uploadHistory.clear();
+    }
+
     function formatBytes(bytes: real): var {
-        // Handle negative or invalid values
         if (bytes < 0 || isNaN(bytes) || !isFinite(bytes)) {
             return {
                 value: 0,
@@ -49,31 +59,40 @@ Singleton {
             };
         }
 
-        if (bytes < 1024) {
+        const kib = 1024;
+        const mib = kib * 1024;
+        const gib = mib * 1024;
+        const tib = gib * 1024;
+
+        if (bytes < kib) {
             return {
                 value: bytes,
                 unit: "B/s"
             };
-        } else if (bytes < 1024 * 1024) {
+        } else if (bytes < mib) {
             return {
-                value: bytes / 1024,
+                value: bytes / kib,
                 unit: "KB/s"
             };
-        } else if (bytes < 1024 * 1024 * 1024) {
+        } else if (bytes < gib) {
             return {
-                value: bytes / (1024 * 1024),
+                value: bytes / mib,
                 unit: "MB/s"
+            };
+        } else if (bytes < tib) {
+            return {
+                value: bytes / gib,
+                unit: "GB/s"
             };
         } else {
             return {
-                value: bytes / (1024 * 1024 * 1024),
-                unit: "GB/s"
+                value: bytes / tib,
+                unit: "TB/s"
             };
         }
     }
 
     function formatBytesTotal(bytes: real): var {
-        // Handle negative or invalid values
         if (bytes < 0 || isNaN(bytes) || !isFinite(bytes)) {
             return {
                 value: 0,
@@ -81,59 +100,255 @@ Singleton {
             };
         }
 
-        if (bytes < 1024) {
+        const kib = 1024;
+        const mib = kib * 1024;
+        const gib = mib * 1024;
+        const tib = gib * 1024;
+
+        if (bytes < kib) {
             return {
                 value: bytes,
                 unit: "B"
             };
-        } else if (bytes < 1024 * 1024) {
+        } else if (bytes < mib) {
             return {
-                value: bytes / 1024,
+                value: bytes / kib,
                 unit: "KB"
             };
-        } else if (bytes < 1024 * 1024 * 1024) {
+        } else if (bytes < gib) {
             return {
-                value: bytes / (1024 * 1024),
+                value: bytes / mib,
                 unit: "MB"
+            };
+        } else if (bytes < tib) {
+            return {
+                value: bytes / gib,
+                unit: "GB"
             };
         } else {
             return {
-                value: bytes / (1024 * 1024 * 1024),
-                unit: "GB"
+                value: bytes / tib,
+                unit: "TB"
             };
         }
     }
 
-    function parseNetDev(content: string): var {
-        const lines = content.split("\n");
-        let totalRx = 0;
-        let totalTx = 0;
+    function isVirtualInterfaceName(iface: string): bool {
+        if (!iface || iface === "lo")
+            return true;
+        return /^(tun\d*|tap\d*|wg\d*|utun\d*|tailscale\d*|zt[0-9a-z]+|docker\d*|veth.*|br-.*|virbr\d*|cni\d*|flannel\..*|podman\d*|cali.*|kube.*|dummy\d*|ifb\d*|sit\d*|gre\d*|ip6tnl\d*|mihomo.*|sing-?box.*|nekobox.*|warp.*|cloudflare.*|nordlynx.*|mullvad.*|proton\d*|amnezia.*|xray.*|.*[-_]xray.*)$/i.test(iface);
+    }
 
+    function parseNetDev(content: string): var {
+        const result = {};
+        if (!content)
+            return result;
+
+        const lines = content.split("\n");
         for (let i = 2; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line)
                 continue;
 
-            const parts = line.split(/\s+/);
-            if (parts.length < 10)
+            const colonIdx = line.indexOf(":");
+            if (colonIdx <= 0)
                 continue;
 
-            const iface = parts[0].replace(":", "");
-            // Skip loopback interface
-            if (iface === "lo")
+            const iface = line.slice(0, colonIdx).trim();
+            if (!iface || iface === "lo")
                 continue;
 
-            const rxBytes = parseFloat(parts[1]) || 0;
-            const txBytes = parseFloat(parts[9]) || 0;
+            const fields = line.slice(colonIdx + 1).trim().split(/\s+/);
+            if (fields.length < 9)
+                continue;
 
-            totalRx += rxBytes;
-            totalTx += txBytes;
+            const rxBytes = Number(fields[0]);
+            const txBytes = Number(fields[8]);
+            if (!isFinite(rxBytes) || !isFinite(txBytes) || rxBytes < 0 || txBytes < 0)
+                continue;
+
+            result[iface] = {
+                rx: rxBytes,
+                tx: txBytes
+            };
         }
 
-        return {
-            rx: totalRx,
-            tx: totalTx
-        };
+        return result;
+    }
+
+    function selectTrackedInterfaces(allIfaces: var): var {
+        const physical = {};
+        let physicalCount = 0;
+
+        for (const iface in allIfaces) {
+            if (!Object.prototype.hasOwnProperty.call(allIfaces, iface))
+                continue;
+
+            const hasSysfs = Object.prototype.hasOwnProperty.call(root._sysfsPhysical, iface);
+            const isVirtual = hasSysfs ? !root._sysfsPhysical[iface] : root.isVirtualInterfaceName(iface);
+            if (!isVirtual) {
+                physical[iface] = allIfaces[iface];
+                physicalCount++;
+            }
+        }
+
+        if (physicalCount > 0)
+            return physical;
+
+        // Container/VM fallback when no hardware-backed NICs exist under /sys/class/net/*/device
+        const fallback = {};
+        let fallbackCount = 0;
+        for (const iface in allIfaces) {
+            if (!Object.prototype.hasOwnProperty.call(allIfaces, iface))
+                continue;
+            if (!root.isVirtualInterfaceName(iface)) {
+                fallback[iface] = allIfaces[iface];
+                fallbackCount++;
+            }
+        }
+
+        return fallbackCount > 0 ? fallback : allIfaces;
+    }
+
+    function _maybeProbeInterfaces(allIfaces: var): void {
+        let needsProbe = false;
+        for (const iface in allIfaces) {
+            if (Object.prototype.hasOwnProperty.call(allIfaces, iface) && !Object.prototype.hasOwnProperty.call(root._sysfsPhysical, iface)) {
+                needsProbe = true;
+                break;
+            }
+        }
+
+        if (!needsProbe)
+            return;
+
+        if (ifaceProbeProc.running) {
+            root._probePending = true;
+        } else {
+            ifaceProbeProc.running = true;
+        }
+    }
+
+    function applySysfsClassification(output: string): void {
+        if (!output)
+            return;
+
+        const nextMap = Object.assign({}, root._sysfsPhysical);
+        const lines = output.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line)
+                continue;
+            const sep = line.lastIndexOf(" ");
+            if (sep <= 0)
+                continue;
+            const iface = line.slice(0, sep).trim();
+            const isPhys = line.slice(sep + 1).trim() === "1";
+            if (iface)
+                nextMap[iface] = isPhys;
+        }
+
+        root._sysfsPhysical = nextMap;
+
+        // Drop any cached baselines for interfaces newly confirmed as virtual
+        if (root._initialized) {
+            let hasAnyPhysical = false;
+            for (const iface in nextMap) {
+                if (Object.prototype.hasOwnProperty.call(nextMap, iface) && nextMap[iface]) {
+                    hasAnyPhysical = true;
+                    break;
+                }
+            }
+            if (hasAnyPhysical) {
+                const cleaned = {};
+                for (const iface in root._prevByIface) {
+                    if (Object.prototype.hasOwnProperty.call(root._prevByIface, iface) && nextMap[iface] !== false)
+                        cleaned[iface] = root._prevByIface[iface];
+                }
+                root._prevByIface = cleaned;
+            }
+        }
+    }
+
+    function processSample(content: string, nowMs: real): void {
+        if (!content || !isFinite(nowMs))
+            return;
+
+        const allIfaces = root.parseNetDev(content);
+        root._maybeProbeInterfaces(allIfaces);
+
+        const tracked = root.selectTrackedInterfaces(allIfaces);
+
+        if (!root._initialized) {
+            const initialPrev = {};
+            for (const iface in tracked) {
+                if (!Object.prototype.hasOwnProperty.call(tracked, iface))
+                    continue;
+                initialPrev[iface] = {
+                    rx: tracked[iface].rx,
+                    tx: tracked[iface].tx
+                };
+            }
+            root._prevByIface = initialPrev;
+            root._prevTimestamp = nowMs;
+            root._downloadSpeed = 0;
+            root._uploadSpeed = 0;
+            root._initialized = true;
+            return;
+        }
+
+        let rxDelta = 0;
+        let txDelta = 0;
+        const nextPrev = {};
+
+        for (const iface in tracked) {
+            if (!Object.prototype.hasOwnProperty.call(tracked, iface))
+                continue;
+
+            const cur = tracked[iface];
+            nextPrev[iface] = {
+                rx: cur.rx,
+                tx: cur.tx
+            };
+
+            // Only diff interfaces seen on the previous tick so hot-plugged NICs seed without spiking
+            if (Object.prototype.hasOwnProperty.call(root._prevByIface, iface)) {
+                const prev = root._prevByIface[iface];
+                if (cur.rx >= prev.rx)
+                    rxDelta += cur.rx - prev.rx;
+                if (cur.tx >= prev.tx)
+                    txDelta += cur.tx - prev.tx;
+            }
+        }
+
+        root._prevByIface = nextPrev;
+
+        const timeDelta = (nowMs - root._prevTimestamp) / 1000;
+        root._prevTimestamp = nowMs;
+
+        if (rxDelta > 0 && isFinite(rxDelta))
+            root._downloadTotal += rxDelta;
+        if (txDelta > 0 && isFinite(txDelta))
+            root._uploadTotal += txDelta;
+
+        const intervalMs = (GlobalConfig.dashboard && GlobalConfig.dashboard.resourceUpdateInterval > 0) ? GlobalConfig.dashboard.resourceUpdateInterval : 1000;
+        const maxNormalGapSec = Math.max((intervalMs / 1000) * 5, 10);
+
+        if (timeDelta <= 0 || timeDelta > maxNormalGapSec) {
+            root._downloadSpeed = 0;
+            root._uploadSpeed = 0;
+            return;
+        }
+
+        const downSpeed = rxDelta / timeDelta;
+        const upSpeed = txDelta / timeDelta;
+
+        root._downloadSpeed = (downSpeed >= 0 && isFinite(downSpeed)) ? downSpeed : 0;
+        root._uploadSpeed = (upSpeed >= 0 && isFinite(upSpeed)) ? upSpeed : 0;
+
+        // Push upload first so downloadHistory.valuesChanged sees both updated maxima
+        uploadHistory.push(root._uploadSpeed);
+        downloadHistory.push(root._downloadSpeed);
     }
 
     CircularBuffer {
@@ -154,6 +369,21 @@ Singleton {
         path: "/proc/net/dev"
     }
 
+    Process {
+        id: ifaceProbeProc
+
+        command: ["sh", "-c", "for d in /sys/class/net/*; do [ -e \"$d\" ] || continue; n=\"${d##*/}\"; [ -e \"$d/device\" ] && printf '%s 1\\n' \"$n\" || printf '%s 0\\n' \"$n\"; done"]
+        stdout: StdioCollector {
+            onStreamFinished: root.applySysfsClassification(text)
+        }
+        onExited: {
+            if (root._probePending) {
+                root._probePending = false;
+                ifaceProbeProc.running = true;
+            }
+        }
+    }
+
     Timer {
         interval: GlobalConfig.dashboard.resourceUpdateInterval
         running: root.refCount > 0
@@ -166,64 +396,7 @@ Singleton {
             if (!content)
                 return;
 
-            const data = root.parseNetDev(content);
-            const now = Date.now();
-
-            if (!root._initialized) {
-                root._initialRxBytes = data.rx;
-                root._initialTxBytes = data.tx;
-                root._prevRxBytes = data.rx;
-                root._prevTxBytes = data.tx;
-                root._prevTimestamp = now;
-                root._initialized = true;
-                return;
-            }
-
-            const timeDelta = (now - root._prevTimestamp) / 1000; // seconds
-            if (timeDelta > 0) {
-                // Calculate byte deltas
-                let rxDelta = data.rx - root._prevRxBytes;
-                let txDelta = data.tx - root._prevTxBytes;
-
-                // Handle counter overflow (when counters wrap around from max to 0)
-                // This happens when counters exceed 32-bit or 64-bit limits
-                if (rxDelta < 0) {
-                    // Counter wrapped around - assume 64-bit counter
-                    rxDelta += Math.pow(2, 64);
-                }
-                if (txDelta < 0) {
-                    txDelta += Math.pow(2, 64);
-                }
-
-                // Calculate speeds
-                root._downloadSpeed = rxDelta / timeDelta;
-                root._uploadSpeed = txDelta / timeDelta;
-
-                if (root._downloadSpeed >= 0 && isFinite(root._downloadSpeed))
-                    downloadHistory.push(root._downloadSpeed);
-
-                if (root._uploadSpeed >= 0 && isFinite(root._uploadSpeed))
-                    uploadHistory.push(root._uploadSpeed);
-            }
-
-            // Calculate totals with overflow handling
-            let downTotal = data.rx - root._initialRxBytes;
-            let upTotal = data.tx - root._initialTxBytes;
-
-            // Handle counter overflow for totals
-            if (downTotal < 0) {
-                downTotal += Math.pow(2, 64);
-            }
-            if (upTotal < 0) {
-                upTotal += Math.pow(2, 64);
-            }
-
-            root._downloadTotal = downTotal;
-            root._uploadTotal = upTotal;
-
-            root._prevRxBytes = data.rx;
-            root._prevTxBytes = data.tx;
-            root._prevTimestamp = now;
+            root.processSample(content, Date.now());
         }
     }
 }

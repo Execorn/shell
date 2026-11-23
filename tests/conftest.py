@@ -126,7 +126,7 @@ mocks = {
         'qmldir': 'module Caelestia\nDummy 1.0 Dummy.qml\nToast 1.0 Toast.qml\n',
         'Dummy.qml': 'import QtQuick\nItem {}\n',
         'Toast.qml': 'import QtQuick\nQtObject {\n    enum Type {\n        Info = 0,\n        Success,\n        Warning,\n        Error\n    }\n    property bool closed: false\n    property string title: ""\n    property string message: ""\n    property string icon: ""\n    property int timeout: 5000\n    property int type: Toast.Info\n    property string category: ""\n    signal finishedClose()\n    function close() { closed = true; }\n    function lock(s) {}\n    function unlock(s) {}\n}\n',
-        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    signal loaded()\n    signal loadFailed(string error, string screen)\n    signal saveFailed(string error, string screen)\n    signal unknownOption(string key, string screen)\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        enabled: true,\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true,\n            kbLayoutChanged: true,\n            configLoaded: false,\n            fullscreen: "important"\n        }\n    })\n    property var osd: ({\n        enabled: true,\n        hideDelay: 1500,\n        enableMicrophone: false,\n        enableBrightness: true\n    })\n    property var bar: ({\n        popouts: {\n            activeIndicator: false\n        }\n    })\n    property var notifs: ({\n        defaultExpireTimeout: 5000,\n        fullscreenExpireTimeout: 10000,\n        expire: true\n    })\n}\n',
+        'GlobalConfig.qml': 'import QtQuick\nQtObject {\n    signal loaded()\n    signal loadFailed(string error, string screen)\n    signal saveFailed(string error, string screen)\n    signal unknownOption(string key, string screen)\n    property var dashboard: ({\n        resourceUpdateInterval: 1000\n    })\n    property var services: ({\n        maxVolume: 1.0,\n        audioIncrement: 0.05,\n        visualiserBars: 20\n    })\n    property var utilities: ({\n        enabled: true,\n        toasts: {\n            audioOutputChanged: true,\n            audioInputChanged: true,\n            kbLayoutChanged: true,\n            configLoaded: false,\n            fullscreen: "important"\n        }\n    })\n    property var osd: ({\n        enabled: true,\n        hideDelay: 1500,\n        enableMicrophone: false,\n        enableBrightness: true\n    })\n    property var bar: ({\n        popouts: {\n            activeIndicator: false\n        }\n    })\n    property var notifs: ({\n        defaultExpireTimeout: 5000,\n        fullscreenExpireTimeout: 10000,\n        expire: true\n    })\n}\n',
         'Tokens.qml': 'import QtQuick\nQtObject {\n    property var sizes: ({\n        bar: {\n            audioWidth: 320,\n            bluetoothWidth: 320\n        },\n        utilities: {\n            toastWidth: 320\n        },\n        notifs: {\n            image: 48\n        }\n    })\n    property var padding: ({\n        large: 16.0,\n        medium: 12.0,\n        small: 8.0,\n        extraSmall: 4.0\n    })\n    property var spacing: ({\n        large: 12.0,\n        medium: 8.0,\n        small: 4.0,\n        extraSmall: 4.0\n    })\n    property var rounding: ({\n        full: 9999.0,\n        large: 12.0,\n        medium: 8.0,\n        small: 4.0,\n        extraSmall: 2.0\n    })\n    property var anim: ({\n        durations: {\n            scale: 1.0,\n            normal: 200,\n            fast: 100,\n            slow: 300\n        }\n    })\n    property var font: ({\n        icon: {\n            large: "Material Symbols Rounded",\n            medium: "Material Symbols Rounded",\n            small: "Material Symbols Rounded",\n            builders: {\n                large: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                },\n                medium: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                },\n                small: {\n                    scale: function(s) { return this; },\n                    weight: function(w) { return this; },\n                    build: function() { return "Material Symbols Rounded"; }\n                }\n            }\n        },\n        body: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        title: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        headline: {\n            medium: "Google Sans",\n            small: "Google Sans",\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        },\n        label: {\n            large: {\n                weight: function(w) { return this; },\n                build: function() { return "Google Sans"; }\n            },\n            builders: {\n                medium: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                },\n                small: {\n                    weight: function(w) { return this; },\n                    build: function() { return "Google Sans"; }\n                }\n            }\n        }\n    })\n}\n',
         'Colours.qml': 'import QtQuick\nQtObject {\n    function layer(c, lvl) { return c; }\n    property var palette: ({\n        m3primary: "#ffffff",\n        m3primaryContainer: "#000000",\n        m3onPrimaryContainer: "#ffffff",\n        m3secondary: "#333333",\n        m3onSecondary: "#ffffff",\n        m3secondaryContainer: "#222222",\n        m3onSecondaryContainer: "#ffffff",\n        m3success: "#22aa44",\n        m3onSuccess: "#ffffff",\n        m3successContainer: "#114422",\n        m3onSuccessContainer: "#ccffcc",\n        m3surface: "#101010",\n        m3surfaceContainer: "#111111",\n        m3surfaceContainerHigh: "#222222",\n        m3onSurface: "#ffffff",\n        m3onSurfaceVariant: "#cccccc",\n        m3outline: "#666666",\n        m3outlineVariant: "#444444",\n        m3error: "#ff4444",\n        m3onError: "#000000",\n        m3errorContainer: "#660000",\n        m3onErrorContainer: "#ffcccc"\n    })\n    property var tPalette: ({\n        m3surfaceContainerLow: "#000000",\n        m3surfaceContainer: "#000000",\n        m3outline: "#000000",\n        m3outlineVariant: "#000000"\n    })\n}\n'
     },
@@ -140,7 +140,7 @@ mocks = {
         'BeatTracker.qml': 'import QtQuick\nItem {}\n'
     },
     'qs/services': {
-        'qmldir': 'module qs.services\nsingleton Audio 1.0 Audio.qml\nsingleton Bluez 1.0 Bluez.qml\nsingleton Brightness 1.0 Brightness.qml\nsingleton Hypr 1.0 Hypr.qml\nsingleton Screens 1.0 Screens.qml\nsingleton Weather 1.0 Weather.qml\nsingleton Nmcli 1.0 Nmcli.qml\nsingleton Notifs 1.0 Notifs.qml\nsingleton ScreenTemp 1.0 ScreenTemp.qml\nsingleton Ocr 1.0 Ocr.qml\nDummy 1.0 Dummy.qml\n',
+        'qmldir': 'module qs.services\nsingleton Audio 1.0 Audio.qml\nsingleton Bluez 1.0 Bluez.qml\nsingleton Brightness 1.0 Brightness.qml\nsingleton Hypr 1.0 Hypr.qml\nsingleton Screens 1.0 Screens.qml\nsingleton Weather 1.0 Weather.qml\nsingleton Nmcli 1.0 Nmcli.qml\nsingleton NetworkUsage 1.0 NetworkUsage.qml\nsingleton Notifs 1.0 Notifs.qml\nsingleton ScreenTemp 1.0 ScreenTemp.qml\nsingleton Ocr 1.0 Ocr.qml\nDummy 1.0 Dummy.qml\n',
         'Dummy.qml': 'import QtQuick\nItem {}\n',
         'Brightness.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    component Monitor: QtObject {\n        property var modelData: null\n        property real brightness: 0.5\n    }\n    signal brightnessUpdated(real value)\n    property var monitors: []\n    function getMonitorForScreen(screen) {\n        return monitors.find(m => m.modelData === screen) || null;\n    }\n}\n',
         'Ocr.qml': 'pragma Singleton\nimport QtQuick\nQtObject {\n    property string ocrText: ""\n    property bool running: false\n    property string lastError: ""\n    function startOcr() {}\n}\n',
@@ -1163,6 +1163,78 @@ class MockHyprDevices(QObject):
     @Property('QVariantList', notify=keyboardsChanged)
     def keyboards(self): return self._keyboards
 
+# Mock CircularBuffer matching Caelestia.Internal.CircularBuffer
+class MockCircularBuffer(QObject):
+    capacityChanged = Signal()
+    countChanged = Signal()
+    maximumChanged = Signal()
+    valuesChanged = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._capacity = 0
+        self._data = []
+        self._max = 0.0
+
+    @Property(int, notify=capacityChanged)
+    def capacity(self): return self._capacity
+
+    @capacity.setter
+    def capacity(self, val):
+        val = max(int(val), 0)
+        if self._capacity == val:
+            return
+        self._capacity = val
+        self._data = []
+        self._max = 0.0
+        self.capacityChanged.emit()
+        self.countChanged.emit()
+        self.maximumChanged.emit()
+        self.valuesChanged.emit()
+
+    @Property(int, notify=countChanged)
+    def count(self): return len(self._data)
+
+    @Property('QVariantList', notify=valuesChanged)
+    def values(self): return list(self._data)
+
+    @Property(float, notify=maximumChanged)
+    def maximum(self): return self._max
+
+    @Slot(float)
+    def push(self, value):
+        if self._capacity <= 0:
+            return
+        old_count = len(self._data)
+        self._data.append(float(value))
+        if len(self._data) > self._capacity:
+            self._data.pop(0)
+        if len(self._data) != old_count:
+            self.countChanged.emit()
+        new_max = max(self._data) if self._data else 0.0
+        if abs(self._max - new_max) > 1e-12:
+            self._max = new_max
+            self.maximumChanged.emit()
+        self.valuesChanged.emit()
+
+    @Slot()
+    def clear(self):
+        if not self._data:
+            return
+        self._data = []
+        self.countChanged.emit()
+        if self._max > 0.0:
+            self._max = 0.0
+            self.maximumChanged.emit()
+        self.valuesChanged.emit()
+
+    @Slot(int, result=float)
+    def at(self, index):
+        if index < 0 or index >= len(self._data):
+            return 0.0
+        return self._data[index]
+
+
 # Mock HyprExtras
 class MockHyprExtras(QObject):
     devicesChanged = Signal()
@@ -1328,6 +1400,10 @@ class MockUtilities(QObject):
     toasts = Property(QObject, lambda self: self._toasts, constant=True)
 
 
+class MockDashboardConfig(QObject):
+    resourceUpdateInterval = Property(int, lambda self: 1000, constant=True)
+
+
 class MockServicesConfig(QObject):
     maxVolume = Property(float, lambda self: 1.0, constant=True)
     audioIncrement = Property(float, lambda self: 0.05, constant=True)
@@ -1337,9 +1413,11 @@ class MockServicesConfig(QObject):
 class MockGlobalConfig(QObject):
     def __init__(self):
         super().__init__()
+        self._dashboard = MockDashboardConfig()
         self._services = MockServicesConfig()
         self._utilities = MockUtilities()
     
+    dashboard = Property(QObject, lambda self: self._dashboard, constant=True)
     services = Property(QObject, lambda self: self._services, constant=True)
     utilities = Property(QObject, lambda self: self._utilities, constant=True)
 
@@ -1640,6 +1718,7 @@ qmlRegisterType(MockImageAnalyser, "Caelestia", 1, 0, "ImageAnalyser")
 qmlRegisterType(MockElapsedTimer, "Caelestia", 1, 0, "ElapsedTimer")
 qmlRegisterType(MockFileSystemModel, "Caelestia.Models", 1, 0, "FileSystemModel")
 qmlRegisterType(MockFileSystemEntry, "Caelestia.Models", 1, 0, "FileSystemEntry")
+qmlRegisterType(MockCircularBuffer, "Caelestia.Internal", 1, 0, "CircularBuffer")
 qmlRegisterType(MockHyprExtras, "Caelestia.Internal", 1, 0, "HyprExtras")
 
 qmlRegisterType(MockNotifData, "Quickshell", 1, 0, "NotifData")
@@ -1703,9 +1782,10 @@ def qapp():
     for f in polluted_files:
         (services_dir / f).unlink(missing_ok=True)
 
-    # Copy Audio.qml, Bluez.qml, ScreenTemp.qml, and Notifs.qml to isolated services path
+    # Copy Audio.qml, Bluez.qml, NetworkUsage.qml, ScreenTemp.qml, and Notifs.qml to isolated services path
     shutil.copy(REPO_ROOT / "services/Audio.qml", base_import_path / "qs/services/Audio.qml")
     shutil.copy(REPO_ROOT / "services/Bluez.qml", base_import_path / "qs/services/Bluez.qml")
+    shutil.copy(REPO_ROOT / "services/NetworkUsage.qml", base_import_path / "qs/services/NetworkUsage.qml")
     shutil.copy(REPO_ROOT / "services/ScreenTemp.qml", base_import_path / "qs/services/ScreenTemp.qml")
     shutil.copy(REPO_ROOT / "services/Notifs.qml", base_import_path / "qs/services/Notifs.qml")
 
